@@ -31,6 +31,6 @@ Tested with "Trikdis SP231" alarm system which uses Paradox-compatible green-yel
 Should work with other Paradox alarm systems.
 
 ## References
-Most of the code is taken from https://github.com/liaan/paradox_esp8266
-Wiring and some ideas taken from https://github.com/taligentx/dscKeybusInterface
-General knowledge about decoding COMBUS and a source for future improvements https://github.com/0ki/paradox
+* Most of the code is taken from https://github.com/liaan/paradox_esp8266
+* Wiring and some ideas taken from https://github.com/taligentx/dscKeybusInterface
+* General knowledge about decoding COMBUS and a source for future improvements https://github.com/0ki/paradox
