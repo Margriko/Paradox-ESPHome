@@ -4,6 +4,9 @@ Connect Paradox COMBUS (green-yellow wires which connect alarm system to the key
 
 Currently the implementation is read-only, it shows motion, window/door, smoke sensor and alarm state status in Home Assistant (with a slight delay).
 
+## Example in Home Assistant
+![Image of HASS example](https://github.com/Margriko/Paradox-ESPHome/blob/master/images/hass-example.png)
+
 ## Wiring
 Because Combus operates at ~12v, we need to step down voltage to levels suitable for esp2866.
 
