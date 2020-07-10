@@ -38,3 +38,6 @@ Should work with other Paradox alarm systems.
 * Wiring and some ideas taken from https://github.com/taligentx/dscKeybusInterface
 * General knowledge about decoding COMBUS and a source for future improvements https://github.com/0ki/paradox
 * ESPHome library https://esphome.io
+
+## Suggestions
+This is a rough implementation, stability is not guaranteed. If you want a stable solution with read/write capability and your alarm system is compatible, take a look at [Paradox Alarm Interface](https://github.com/ParadoxAlarmInterface/pai), which connects to alarm system by using serial port. In my case my alarm system was not compatible and had to use my own solution.
