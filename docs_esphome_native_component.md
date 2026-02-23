@@ -19,6 +19,7 @@ components/
     __init__.py          # hub schema (`paradox_combus:`)
     binary_sensor.py     # zone entities
     text_sensor.py       # alarm status entity
+    alarm_control_panel.py # arm/disarm entity + write sequences
     paradox_combus.h     # hub implementation
     paradox_combus.cpp
 ```
@@ -55,6 +56,24 @@ text_sensor:
     type: alarm_status
     name: "Alarm Status"
 ```
+
+
+### Alarm control panel (read/write)
+
+```yaml
+alarm_control_panel:
+  - platform: paradox_combus
+    paradox_combus_id: combus
+    name: "Alarm"
+    disarm_sequence: [0x31, 0x32, 0x33, 0x34]
+    arm_home_sequence: [0x53]
+    arm_away_sequence: [0x41]
+    arm_night_sequence: [0x4E]
+```
+
+- At least one sequence is required.
+- Sequences are raw bytes transmitted LSB-first on COMBUS and are panel-specific.
+- The implementation is experimental and intended as a starting point for tuning against your panel.
 
 ## Notes
 

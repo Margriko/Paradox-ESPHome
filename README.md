@@ -2,7 +2,7 @@
 
 Connect Paradox COMBUS (green-yellow wires which connect alarm system to the keypad) alarm interface to Home Assistant using ESP8266/ESP32 device and ESPHome library.
 
-Currently the implementation is read-only, it shows motion, window/door, smoke sensor and alarm state status in Home Assistant (with a slight delay).
+The implementation can read COMBUS zone/alarm status and now includes an **experimental** COMBUS writer that can be mapped to Home Assistant alarm actions via `alarm_control_panel` (arming/disarming sequences still depend on panel model/programming).
 
 ## Example in Home Assistant
 ![Image of HASS example](https://github.com/Margriko/Paradox-ESPHome/blob/master/images/hass-example.png)
@@ -33,6 +33,7 @@ This repository now includes a native ESPHome **external component** (`component
 - `paradox_combus:` hub configuration
 - `binary_sensor` platform `paradox_combus` with per-zone sensors
 - `text_sensor` platform `paradox_combus` for alarm status
+- `alarm_control_panel` platform `paradox_combus` for arm/disarm commands (experimental write support)
 
 That means there is no need for `custom_component` + `template` sensor callback wiring.
 
@@ -61,6 +62,19 @@ text_sensor:
     paradox_combus_id: combus
     type: alarm_status
     name: "Alarm Status"
+```
+
+Alarm control panel YAML (experimental write path):
+
+```yaml
+alarm_control_panel:
+  - platform: paradox_combus
+    paradox_combus_id: combus
+    name: "Alarm"
+    disarm_sequence: [0x31, 0x32, 0x33, 0x34]
+    arm_home_sequence: [0x53]
+    arm_away_sequence: [0x41]
+    arm_night_sequence: [0x4E]
 ```
 
 For a full multi-zone example, see `alarm.yaml`.
