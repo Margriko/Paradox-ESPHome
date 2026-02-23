@@ -5,8 +5,9 @@ esphome:
 
 external_components:
   - source:
-      type: local
-      path: components
+      type: git
+      url: https://github.com/Margriko/Paradox-ESPHome
+      ref: v2
 
 wifi:
   ssid: !secret wifi_name

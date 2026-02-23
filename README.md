@@ -42,8 +42,9 @@ Minimal YAML:
 ```yaml
 external_components:
   - source:
-      type: local
-      path: components
+      type: git
+      url: https://github.com/Margriko/Paradox-ESPHome
+      ref: v2
 
 paradox_combus:
   id: combus
@@ -77,7 +78,7 @@ alarm_control_panel:
     arm_night_sequence: [0x4E]
 ```
 
-For a full multi-zone example, see `alarm.yaml`.
+For a full multi-zone example, see `alarm-example.yaml`.
 
 ## OTA updates
 In order to make OTA updates, connection switch in frontend must be switched to OFF.
