@@ -4,7 +4,7 @@ from esphome import pins
 from esphome.const import CONF_ID
 
 CODEOWNERS = ["@Margriko"]
-AUTO_LOAD = ["alarm_control_panel", "binary_sensor", "text_sensor"]
+AUTO_LOAD = ["alarm_control_panel", "binary_sensor"]
 
 paradox_combus_ns = cg.esphome_ns.namespace("paradox_combus")
 ParadoxCombusComponent = paradox_combus_ns.class_("ParadoxCombusComponent", cg.Component)

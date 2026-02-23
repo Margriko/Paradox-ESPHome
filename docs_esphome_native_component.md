@@ -18,7 +18,6 @@ components/
   paradox_combus/
     __init__.py          # hub schema (`paradox_combus:`)
     binary_sensor.py     # zone entities
-    text_sensor.py       # alarm status entity
     alarm_control_panel.py # arm/disarm entity + write sequences
     paradox_combus.h     # hub implementation
     paradox_combus.cpp
@@ -47,18 +46,7 @@ binary_sensor:
 
 - `zone` supports values `1..32`.
 
-### Alarm status text sensor
-
-```yaml
-text_sensor:
-  - platform: paradox_combus
-    paradox_combus_id: combus
-    type: alarm_status
-    name: "Alarm Status"
-```
-
-
-### Alarm control panel (read/write)
+### Alarm control panel (read status, optional write)
 
 ```yaml
 alarm_control_panel:
@@ -73,7 +61,7 @@ alarm_control_panel:
     arm_night_sequence: [0x4E]
 ```
 
-- At least one sequence/code config is required (`disarm_sequence`, arm sequence, and/or `codes`).
+- No write config is required if you only need alarm status/state in Home Assistant.
 - `codes` follows the same structure as template alarm and is used to validate both arm and disarm commands.
 - If `disarm_sequence` is omitted, the entered code is sent as keypad digits for disarm; arm modes send `code + arm_*_sequence`.
 - Sequences are raw bytes transmitted LSB-first on COMBUS and are panel-specific.

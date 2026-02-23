@@ -238,11 +238,6 @@ void ParadoxCombusComponent::disconnect_combus_() {
 
 void ParadoxCombusComponent::setup() { this->connect_combus_(); }
 
-void ParadoxCombusComponent::publish_alarm_state_(const std::string &value) {
-  if (this->alarm_status_sensor_ != nullptr) {
-    this->alarm_status_sensor_->publish_state(value);
-  }
-}
 
 void ParadoxCombusComponent::publish_alarm_control_panel_state_(alarm_control_panel::AlarmControlPanelState state) {
   if (this->alarm_control_panel_ != nullptr) {
@@ -262,7 +257,6 @@ void ParadoxCombusComponent::publish_zone_state_(uint8_t zone, bool open) {
 
 void ParadoxCombusComponent::loop() {
   if (!this->get_combus_connection_status_()) {
-    this->publish_alarm_state_(STATUS_UNAVAILABLE);
     this->publish_alarm_control_panel_state_(alarm_control_panel::ACP_STATE_DISARMED);
     for (int i = 0; i < 32; i++) {
       this->publish_zone_state_(i + 1, false);
@@ -303,27 +297,21 @@ void ParadoxCombusComponent::process_alarm_status_(String &msg) {
 
   if (msg[((8 * 7) + 1)] == '0') {
     if (msg[((8 * 2) + 5)] == '1') {
-      this->publish_alarm_state_(STATUS_STAY);
       this->publish_alarm_control_panel_state_(alarm_control_panel::ACP_STATE_ARMED_HOME);
     }
     if (msg[((8 * 6) + 5)] == '1') {
-      this->publish_alarm_state_(STATUS_SLEEP);
       this->publish_alarm_control_panel_state_(alarm_control_panel::ACP_STATE_ARMED_NIGHT);
     }
     if (msg[((8 * 2) + 1)] == '1') {
       if (msg[((8 * 2) + 0)] == '1') {
-        this->publish_alarm_state_("exit");
         this->publish_alarm_control_panel_state_(alarm_control_panel::ACP_STATE_ARMING);
       } else if (msg[((8 * 2) + 0)] == '0') {
-        this->publish_alarm_state_("fullalarm");
         this->publish_alarm_control_panel_state_(alarm_control_panel::ACP_STATE_TRIGGERED);
       } else {
-        this->publish_alarm_state_(STATUS_ARM);
         this->publish_alarm_control_panel_state_(alarm_control_panel::ACP_STATE_ARMED_AWAY);
       }
     }
   } else {
-    this->publish_alarm_state_(STATUS_OFF);
     this->publish_alarm_control_panel_state_(alarm_control_panel::ACP_STATE_DISARMED);
   }
 }
