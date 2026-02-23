@@ -7,6 +7,30 @@ namespace paradox_combus {
 
 static const char *const TAG = "paradox_combus";
 
+void ParadoxAlarmControlPanel::control(const alarm_control_panel::AlarmControlPanelCall &call) {
+  if (this->parent_ == nullptr || !call.get_state().has_value()) {
+    return;
+  }
+
+  switch (*call.get_state()) {
+    case alarm_control_panel::ACP_STATE_DISARMED:
+      this->parent_->request_disarm();
+      break;
+    case alarm_control_panel::ACP_STATE_ARMED_HOME:
+      this->parent_->request_arm_home();
+      break;
+    case alarm_control_panel::ACP_STATE_ARMED_AWAY:
+      this->parent_->request_arm_away();
+      break;
+    case alarm_control_panel::ACP_STATE_ARMED_NIGHT:
+      this->parent_->request_arm_night();
+      break;
+    default:
+      ESP_LOGW(TAG, "Requested alarm state is not currently mapped to COMBUS write sequence");
+      break;
+  }
+}
+
 void ParadoxCombusComponent::register_zone_sensor(uint8_t zone, binary_sensor::BinarySensor *sensor) {
   if (zone < 1 || zone > 32) {
     ESP_LOGW(TAG, "Ignoring zone %u (valid range is 1..32)", zone);
@@ -45,6 +69,60 @@ void ParadoxCombusComponent::capture_combus_bits_() {
   }
 }
 
+void ParadoxCombusComponent::queue_write_sequence_(const std::vector<uint8_t> &sequence) {
+  if (sequence.empty()) {
+    ESP_LOGW(TAG, "Cannot queue empty COMBUS write sequence");
+    return;
+  }
+
+  for (uint8_t value : sequence) {
+    for (uint8_t bit = 0; bit < 8; bit++) {
+      this->tx_bits_.push_back((value >> bit) & 0x01);
+    }
+  }
+
+  ESP_LOGD(TAG, "Queued COMBUS write sequence (%u bytes, %u bits pending)", static_cast<unsigned>(sequence.size()),
+           static_cast<unsigned>(this->tx_bits_.size()));
+}
+
+void ParadoxCombusComponent::request_disarm() { this->queue_write_sequence_(this->disarm_sequence_); }
+
+void ParadoxCombusComponent::request_arm_home() { this->queue_write_sequence_(this->arm_home_sequence_); }
+
+void ParadoxCombusComponent::request_arm_away() { this->queue_write_sequence_(this->arm_away_sequence_); }
+
+void ParadoxCombusComponent::request_arm_night() { this->queue_write_sequence_(this->arm_night_sequence_); }
+
+void ParadoxCombusComponent::process_pending_bus_writes_() {
+  if (this->clk_pin_ == nullptr || this->dta_pin_ == nullptr) {
+    return;
+  }
+
+  if (this->tx_bits_.empty()) {
+    if (this->tx_drive_low_) {
+      this->dta_pin_->pin_mode(gpio::FLAG_INPUT);
+      this->tx_drive_low_ = false;
+    }
+    return;
+  }
+
+  const bool clk_state = this->clk_pin_->digital_read();
+  if (this->last_clk_state_ && !clk_state) {
+    const bool write_bit = this->tx_bits_.front();
+    this->tx_bits_.pop_front();
+
+    // COMBUS uses open collector signalling: logical '1' is driven low, logical '0' is release.
+    if (write_bit) {
+      this->dta_pin_->pin_mode(gpio::FLAG_OUTPUT);
+      this->dta_pin_->digital_write(false);
+      this->tx_drive_low_ = true;
+    } else {
+      this->dta_pin_->pin_mode(gpio::FLAG_INPUT);
+      this->tx_drive_low_ = false;
+    }
+  }
+}
+
 void ParadoxCombusComponent::connect_combus_() {
   if (this->clk_pin_ == nullptr || this->dta_pin_ == nullptr) {
     ESP_LOGE(TAG, "clk_pin and dta_pin are required");
@@ -65,17 +143,24 @@ void ParadoxCombusComponent::connect_combus_() {
 
 void ParadoxCombusComponent::disconnect_combus_() {
   this->sample_pending_ = false;
+  this->tx_bits_.clear();
+  this->dta_pin_->pin_mode(gpio::FLAG_INPUT);
+  this->tx_drive_low_ = false;
   this->bus_message_.clear();
   this->combus_connection_status_ = false;
 }
 
-void ParadoxCombusComponent::setup() {
-  this->connect_combus_();
-}
+void ParadoxCombusComponent::setup() { this->connect_combus_(); }
 
 void ParadoxCombusComponent::publish_alarm_state_(const std::string &value) {
   if (this->alarm_status_sensor_ != nullptr) {
     this->alarm_status_sensor_->publish_state(value);
+  }
+}
+
+void ParadoxCombusComponent::publish_alarm_control_panel_state_(alarm_control_panel::AlarmControlPanelState state) {
+  if (this->alarm_control_panel_ != nullptr) {
+    this->alarm_control_panel_->publish_state(state);
   }
 }
 
@@ -92,6 +177,7 @@ void ParadoxCombusComponent::publish_zone_state_(uint8_t zone, bool open) {
 void ParadoxCombusComponent::loop() {
   if (!this->get_combus_connection_status_()) {
     this->publish_alarm_state_(STATUS_UNAVAILABLE);
+    this->publish_alarm_control_panel_state_(alarm_control_panel::ACP_STATE_DISARMED);
     for (int i = 0; i < 32; i++) {
       this->publish_zone_state_(i + 1, false);
     }
@@ -99,6 +185,7 @@ void ParadoxCombusComponent::loop() {
   }
 
   this->capture_combus_bits_();
+  this->process_pending_bus_writes_();
 
   if (!this->check_clock_idle_() || this->bus_message_.length() < 2) {
     return;
@@ -131,21 +218,27 @@ void ParadoxCombusComponent::process_alarm_status_(String &msg) {
   if (msg[((8 * 7) + 1)] == '0') {
     if (msg[((8 * 2) + 5)] == '1') {
       this->publish_alarm_state_(STATUS_STAY);
+      this->publish_alarm_control_panel_state_(alarm_control_panel::ACP_STATE_ARMED_HOME);
     }
     if (msg[((8 * 6) + 5)] == '1') {
       this->publish_alarm_state_(STATUS_SLEEP);
+      this->publish_alarm_control_panel_state_(alarm_control_panel::ACP_STATE_ARMED_NIGHT);
     }
     if (msg[((8 * 2) + 1)] == '1') {
       if (msg[((8 * 2) + 0)] == '1') {
         this->publish_alarm_state_("exit");
+        this->publish_alarm_control_panel_state_(alarm_control_panel::ACP_STATE_ARMING);
       } else if (msg[((8 * 2) + 0)] == '0') {
         this->publish_alarm_state_("fullalarm");
+        this->publish_alarm_control_panel_state_(alarm_control_panel::ACP_STATE_TRIGGERED);
       } else {
         this->publish_alarm_state_(STATUS_ARM);
+        this->publish_alarm_control_panel_state_(alarm_control_panel::ACP_STATE_ARMED_AWAY);
       }
     }
   } else {
     this->publish_alarm_state_(STATUS_OFF);
+    this->publish_alarm_control_panel_state_(alarm_control_panel::ACP_STATE_DISARMED);
   }
 }
 

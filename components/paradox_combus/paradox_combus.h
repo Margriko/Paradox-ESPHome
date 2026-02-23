@@ -2,15 +2,29 @@
 
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
+#include "esphome/components/alarm_control_panel/alarm_control_panel.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 
 #include <array>
+#include <cstdint>
+#include <deque>
 #include <string>
+#include <vector>
 
 namespace esphome {
 namespace paradox_combus {
 
+class ParadoxCombusComponent;
+
+class ParadoxAlarmControlPanel : public alarm_control_panel::AlarmControlPanel {
+ public:
+  void set_parent(ParadoxCombusComponent *parent) { this->parent_ = parent; }
+
+ protected:
+  void control(const alarm_control_panel::AlarmControlPanelCall &call) override;
+  ParadoxCombusComponent *parent_{nullptr};
+};
 
 class ParadoxZoneBinarySensor : public binary_sensor::BinarySensor {};
 
@@ -21,6 +35,17 @@ class ParadoxCombusComponent : public Component {
 
   void register_zone_sensor(uint8_t zone, binary_sensor::BinarySensor *sensor);
   void set_alarm_status_sensor(text_sensor::TextSensor *sensor) { this->alarm_status_sensor_ = sensor; }
+  void set_alarm_control_panel(ParadoxAlarmControlPanel *panel) { this->alarm_control_panel_ = panel; }
+
+  void set_disarm_sequence(const std::vector<uint8_t> &sequence) { this->disarm_sequence_ = sequence; }
+  void set_arm_home_sequence(const std::vector<uint8_t> &sequence) { this->arm_home_sequence_ = sequence; }
+  void set_arm_away_sequence(const std::vector<uint8_t> &sequence) { this->arm_away_sequence_ = sequence; }
+  void set_arm_night_sequence(const std::vector<uint8_t> &sequence) { this->arm_night_sequence_ = sequence; }
+
+  void request_disarm();
+  void request_arm_home();
+  void request_arm_away();
+  void request_arm_night();
 
   void setup() override;
   void loop() override;
@@ -42,13 +67,26 @@ class ParadoxCombusComponent : public Component {
 
   void publish_alarm_state_(const std::string &value);
   void publish_zone_state_(uint8_t zone, bool open);
+  void publish_alarm_control_panel_state_(alarm_control_panel::AlarmControlPanelState state);
+
   void capture_combus_bits_();
+  void process_pending_bus_writes_();
+  void queue_write_sequence_(const std::vector<uint8_t> &sequence);
 
   InternalGPIOPin *clk_pin_{nullptr};
   InternalGPIOPin *dta_pin_{nullptr};
 
   std::array<binary_sensor::BinarySensor *, 32> zone_sensors_{};
   text_sensor::TextSensor *alarm_status_sensor_{nullptr};
+  ParadoxAlarmControlPanel *alarm_control_panel_{nullptr};
+
+  std::vector<uint8_t> disarm_sequence_{};
+  std::vector<uint8_t> arm_home_sequence_{};
+  std::vector<uint8_t> arm_away_sequence_{};
+  std::vector<uint8_t> arm_night_sequence_{};
+
+  std::deque<bool> tx_bits_{};
+  bool tx_drive_low_{false};
 
   std::string bus_message_;
   bool last_clk_state_{true};
