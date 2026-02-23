@@ -13,9 +13,9 @@ Because Combus operates at ~12v, we need to step down voltage to levels suitable
 Wiring example:
 
       Alarm Aux(+) --- Voltage regulator (5v for Wemos, NodeMCU, 3.3V for generic esp8266) --- VIN pin on esp8266
-    
+
       Alarm Aux(-) --- esp8266 Ground
-    
+
                                            +--- clock pin (Wemos, NodeMCU: D1, D2, D8)
       Alarm Yellow --- 15k ohm resistor ---|
                                            +--- 10k ohm resistor --- Ground
@@ -23,8 +23,45 @@ Wiring example:
                                            +--- data read pin (Wemos, NodeMCU: D1, D2, D8)
       Alarm Green ---- 15k ohm resistor ---|
                                            +--- 10k ohm resistor --- Ground
- 
-When using different pins, be sure to modify sources to match your configuration.
+
+## Native ESPHome component usage
+
+This repository now includes a native ESPHome **external component** (`components/paradox_combus`) that exposes:
+
+- `paradox_combus:` hub configuration
+- `binary_sensor` platform `paradox_combus` with per-zone sensors
+- `text_sensor` platform `paradox_combus` for alarm status
+
+That means there is no need for `custom_component` + `template` sensor callback wiring.
+
+Minimal YAML:
+
+```yaml
+external_components:
+  - source:
+      type: local
+      path: components
+
+paradox_combus:
+  id: combus
+  clk_pin: D1
+  dta_pin: D2
+
+binary_sensor:
+  - platform: paradox_combus
+    paradox_combus_id: combus
+    zone: 1
+    name: "Entrance motion"
+    device_class: motion
+
+text_sensor:
+  - platform: paradox_combus
+    paradox_combus_id: combus
+    type: alarm_status
+    name: "Alarm Status"
+```
+
+For a full multi-zone example, see `alarm.yaml`.
 
 ## OTA updates
 In order to make OTA updates, connection switch in frontend must be switched to OFF.
