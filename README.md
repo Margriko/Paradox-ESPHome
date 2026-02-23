@@ -36,7 +36,7 @@ This repository now includes a native ESPHome **external component** (`component
 
 That means there is no need for `custom_component` + `template` sensor callback wiring.
 
-Minimal YAML:
+YAML example (single `alarm_control_panel` entry; write settings are optional):
 
 ```yaml
 external_components:
@@ -61,16 +61,7 @@ alarm_control_panel:
   - platform: paradox_combus
     paradox_combus_id: combus
     name: "Alarm"
-```
-
-Alarm control panel YAML (read-only status by default, optional write path):
-
-```yaml
-alarm_control_panel:
-  - platform: paradox_combus
-    paradox_combus_id: combus
-    name: "Alarm"
-
+    # Optional write-path configuration:
     disarm_sequence: [0x31, 0x32, 0x33, 0x34]
     codes:
       - "1234"

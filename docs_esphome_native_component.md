@@ -46,7 +46,7 @@ binary_sensor:
 
 - `zone` supports values `1..32`.
 
-### Alarm control panel (read status, optional write)
+### Alarm control panel (read status, optional write in the same entry)
 
 ```yaml
 alarm_control_panel:
