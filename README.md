@@ -32,12 +32,11 @@ This repository now includes a native ESPHome **external component** (`component
 
 - `paradox_combus:` hub configuration
 - `binary_sensor` platform `paradox_combus` with per-zone sensors
-- `text_sensor` platform `paradox_combus` for alarm status
-- `alarm_control_panel` platform `paradox_combus` for arm/disarm commands (experimental write support)
+- `alarm_control_panel` platform `paradox_combus` for integrated alarm status + arm/disarm commands (experimental write support)
 
 That means there is no need for `custom_component` + `template` sensor callback wiring.
 
-Minimal YAML:
+YAML example (single `alarm_control_panel` entry; write settings are optional):
 
 ```yaml
 external_components:
@@ -58,20 +57,11 @@ binary_sensor:
     name: "Entrance motion"
     device_class: motion
 
-text_sensor:
-  - platform: paradox_combus
-    paradox_combus_id: combus
-    type: alarm_status
-    name: "Alarm Status"
-```
-
-Alarm control panel YAML (experimental write path):
-
-```yaml
 alarm_control_panel:
   - platform: paradox_combus
     paradox_combus_id: combus
     name: "Alarm"
+    # Optional write-path configuration:
     disarm_sequence: [0x31, 0x32, 0x33, 0x34]
     codes:
       - "1234"

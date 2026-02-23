@@ -22,36 +22,15 @@ def _validate_code(value):
     return value
 
 
-def _validate_non_empty(config):
-    if not any(
-        config.get(key)
-        for key in (
-            CONF_DISARM_SEQUENCE,
-            CONF_ARM_HOME_SEQUENCE,
-            CONF_ARM_AWAY_SEQUENCE,
-            CONF_ARM_NIGHT_SEQUENCE,
-            CONF_CODES,
-        )
-    ):
-        raise cv.Invalid(
-            "At least one write/control field must be configured (disarm_sequence/arm_home_sequence/"
-            "arm_away_sequence/arm_night_sequence/codes)"
-        )
-    return config
-
-
-CONFIG_SCHEMA = cv.All(
-    alarm_control_panel.alarm_control_panel_schema(ParadoxAlarmControlPanel).extend(
-        {
-            cv.GenerateID(CONF_PARADOX_COMBUS_ID): cv.use_id(ParadoxCombusComponent),
-            cv.Optional(CONF_DISARM_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
-            cv.Optional(CONF_ARM_HOME_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
-            cv.Optional(CONF_ARM_AWAY_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
-            cv.Optional(CONF_ARM_NIGHT_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
-            cv.Optional(CONF_CODES): cv.ensure_list(_validate_code),
-        }
-    ),
-    _validate_non_empty,
+CONFIG_SCHEMA = alarm_control_panel.alarm_control_panel_schema(ParadoxAlarmControlPanel).extend(
+    {
+        cv.GenerateID(CONF_PARADOX_COMBUS_ID): cv.use_id(ParadoxCombusComponent),
+        cv.Optional(CONF_DISARM_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
+        cv.Optional(CONF_ARM_HOME_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
+        cv.Optional(CONF_ARM_AWAY_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
+        cv.Optional(CONF_ARM_NIGHT_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
+        cv.Optional(CONF_CODES): cv.ensure_list(_validate_code),
+    }
 )
 
 

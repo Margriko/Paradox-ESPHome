@@ -4,7 +4,6 @@
 #include "esphome/core/hal.h"
 #include "esphome/components/alarm_control_panel/alarm_control_panel.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
-#include "esphome/components/text_sensor/text_sensor.h"
 
 #include <array>
 #include <cstdint>
@@ -37,7 +36,6 @@ class ParadoxCombusComponent : public Component {
   void set_dta_pin(InternalGPIOPin *pin) { this->dta_pin_ = pin; }
 
   void register_zone_sensor(uint8_t zone, binary_sensor::BinarySensor *sensor);
-  void set_alarm_status_sensor(text_sensor::TextSensor *sensor) { this->alarm_status_sensor_ = sensor; }
   void set_alarm_control_panel(ParadoxAlarmControlPanel *panel) { this->alarm_control_panel_ = panel; }
 
   void set_disarm_sequence(const std::vector<uint8_t> &sequence) { this->disarm_sequence_ = sequence; }
@@ -77,7 +75,6 @@ class ParadoxCombusComponent : public Component {
   unsigned int get_int_from_string_(String str);
   uint8_t *str_to_bin_array_(String &st);
 
-  void publish_alarm_state_(const std::string &value);
   void publish_zone_state_(uint8_t zone, bool open);
   void publish_alarm_control_panel_state_(alarm_control_panel::AlarmControlPanelState state);
 
@@ -89,7 +86,6 @@ class ParadoxCombusComponent : public Component {
   InternalGPIOPin *dta_pin_{nullptr};
 
   std::array<binary_sensor::BinarySensor *, 32> zone_sensors_{};
-  text_sensor::TextSensor *alarm_status_sensor_{nullptr};
   ParadoxAlarmControlPanel *alarm_control_panel_{nullptr};
 
   std::vector<uint8_t> disarm_sequence_{};
@@ -108,11 +104,6 @@ class ParadoxCombusComponent : public Component {
   unsigned long last_clk_signal_{0};
   bool combus_connection_status_{false};
 
-  const std::string STATUS_UNAVAILABLE = "unavailable";
-  const std::string STATUS_ARM = "armed_away";
-  const std::string STATUS_SLEEP = "armed_night";
-  const std::string STATUS_STAY = "armed_home";
-  const std::string STATUS_OFF = "disarmed";
 };
 
 }  // namespace paradox_combus

@@ -84,14 +84,6 @@ binary_sensor:
     name: "Entrance door"
     device_class: door
 
-text_sensor:
-  - platform: paradox_combus
-    paradox_combus_id: combus
-    type: alarm_status
-    name: "Alarm Status"
-    icon: "mdi:shield"
-
-
 alarm_control_panel:
   - platform: paradox_combus
     paradox_combus_id: combus
