@@ -41,19 +41,23 @@ class ParadoxCombusComponent : public Component {
   void set_alarm_control_panel(ParadoxAlarmControlPanel *panel) { this->alarm_control_panel_ = panel; }
 
   void set_disarm_sequence(const std::vector<uint8_t> &sequence) { this->disarm_sequence_ = sequence; }
+  void set_codes(const std::vector<std::string> &codes) { this->codes_ = codes; }
   void set_arm_home_sequence(const std::vector<uint8_t> &sequence) { this->arm_home_sequence_ = sequence; }
   void set_arm_away_sequence(const std::vector<uint8_t> &sequence) { this->arm_away_sequence_ = sequence; }
   void set_arm_night_sequence(const std::vector<uint8_t> &sequence) { this->arm_night_sequence_ = sequence; }
 
-  void request_disarm();
-  void request_arm_home();
-  void request_arm_away();
-  void request_arm_night();
+  void request_disarm(const optional<std::string> &code);
+  void request_arm_home(const optional<std::string> &code);
+  void request_arm_away(const optional<std::string> &code);
+  void request_arm_night(const optional<std::string> &code);
 
-  bool supports_disarm() const { return !this->disarm_sequence_.empty(); }
+  bool supports_disarm() const { return !this->disarm_sequence_.empty() || this->requires_code(); }
   bool supports_arm_home() const { return !this->arm_home_sequence_.empty(); }
   bool supports_arm_away() const { return !this->arm_away_sequence_.empty(); }
   bool supports_arm_night() const { return !this->arm_night_sequence_.empty(); }
+  bool requires_code() const { return !this->codes_.empty(); }
+  bool is_valid_code(const optional<std::string> &code) const;
+  std::vector<uint8_t> code_to_sequence_(const optional<std::string> &code) const;
 
   void setup() override;
   void loop() override;
@@ -92,6 +96,7 @@ class ParadoxCombusComponent : public Component {
   std::vector<uint8_t> arm_home_sequence_{};
   std::vector<uint8_t> arm_away_sequence_{};
   std::vector<uint8_t> arm_night_sequence_{};
+  std::vector<std::string> codes_{};
 
   std::deque<bool> tx_bits_{};
   bool tx_drive_low_{false};

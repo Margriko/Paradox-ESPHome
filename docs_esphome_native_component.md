@@ -66,12 +66,16 @@ alarm_control_panel:
     paradox_combus_id: combus
     name: "Alarm"
     disarm_sequence: [0x31, 0x32, 0x33, 0x34]
+    codes:
+      - "1234"
     arm_home_sequence: [0x53]
     arm_away_sequence: [0x41]
     arm_night_sequence: [0x4E]
 ```
 
-- At least one sequence is required.
+- At least one sequence/code config is required (`disarm_sequence`, arm sequence, and/or `codes`).
+- `codes` follows the same structure as template alarm and is used to validate both arm and disarm commands.
+- If `disarm_sequence` is omitted, the entered code is sent as keypad digits for disarm; arm modes send `code + arm_*_sequence`.
 - Sequences are raw bytes transmitted LSB-first on COMBUS and are panel-specific.
 - The implementation is experimental and intended as a starting point for tuning against your panel.
 
