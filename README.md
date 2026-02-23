@@ -1,6 +1,6 @@
 # Paradox-ESPHome
 
-Connect Paradox COMBUS (green-yellow wires which connect alarm system to the keypad) alarm interface to Home Assistant using esp8266 device and ESPHome library.
+Connect Paradox COMBUS (green-yellow wires which connect alarm system to the keypad) alarm interface to Home Assistant using ESP8266/ESP32 device and ESPHome library.
 
 Currently the implementation is read-only, it shows motion, window/door, smoke sensor and alarm state status in Home Assistant (with a slight delay).
 
@@ -12,7 +12,7 @@ Because Combus operates at ~12v, we need to step down voltage to levels suitable
 
 Wiring example:
 
-      Alarm Aux(+) --- Voltage regulator (5v for Wemos, NodeMCU, 3.3V for generic esp8266) --- VIN pin on esp8266
+      Alarm Aux(+) --- Voltage regulator (5v for Wemos, NodeMCU, 3.3V for generic ESP8266/ESP32) --- VIN pin on esp8266
 
       Alarm Aux(-) --- esp8266 Ground
 
@@ -27,6 +27,8 @@ Wiring example:
 ## Native ESPHome component usage
 
 This repository now includes a native ESPHome **external component** (`components/paradox_combus`) that exposes:
+
+- ESP8266/ESP32-compatible COMBUS reader implemented as a native polling loop (no timer/interrupt dependency)
 
 - `paradox_combus:` hub configuration
 - `binary_sensor` platform `paradox_combus` with per-zone sensors
