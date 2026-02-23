@@ -1,13 +1,14 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import alarm_control_panel
-from esphome.const import CONF_CODES, CONF_ID
+from esphome.const import CONF_ID
 
 from . import ParadoxAlarmControlPanel, ParadoxCombusComponent
 
 DEPENDENCIES = ["paradox_combus"]
 
 CONF_PARADOX_COMBUS_ID = "paradox_combus_id"
+CONF_CODES = "codes"
 CONF_DISARM_SEQUENCE = "disarm_sequence"
 CONF_ARM_HOME_SEQUENCE = "arm_home_sequence"
 CONF_ARM_AWAY_SEQUENCE = "arm_away_sequence"
