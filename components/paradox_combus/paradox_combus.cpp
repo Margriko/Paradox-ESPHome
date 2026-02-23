@@ -6,7 +6,6 @@ namespace esphome {
 namespace paradox_combus {
 
 static const char *const TAG = "paradox_combus";
-ParadoxCombusComponent *ParadoxCombusComponent::instance_ = nullptr;
 
 void ParadoxCombusComponent::register_zone_sensor(uint8_t zone, binary_sensor::BinarySensor *sensor) {
   if (zone < 1 || zone > 32) {
@@ -16,37 +15,32 @@ void ParadoxCombusComponent::register_zone_sensor(uint8_t zone, binary_sensor::B
   this->zone_sensors_[zone - 1] = sensor;
 }
 
-void IRAM_ATTR ParadoxCombusComponent::interrupt_clock_falling_() {
-  if (instance_ == nullptr) {
+void ParadoxCombusComponent::capture_combus_bits_() {
+  if (this->clk_pin_ == nullptr || this->dta_pin_ == nullptr) {
     return;
   }
 
-  instance_->last_clk_signal_ = micros();
-  instance_->clk_pin_triggered_ = true;
-  timer1_write(750);
-}
+  const unsigned long now = micros();
+  const bool clk_state = this->clk_pin_->digital_read();
 
-void IRAM_ATTR ParadoxCombusComponent::read_data_pin_() {
-  if (instance_ == nullptr || instance_->dta_pin_ == nullptr) {
+  if (this->last_clk_state_ && !clk_state) {
+    this->last_clk_signal_ = now;
+    this->pending_sample_at_ = now + 150;
+    this->sample_pending_ = true;
+  }
+  this->last_clk_state_ = clk_state;
+
+  if (!this->sample_pending_ || static_cast<long>(now - this->pending_sample_at_) < 0) {
     return;
   }
 
-  if (!instance_->clk_pin_triggered_) {
-    return;
-  }
+  this->sample_pending_ = false;
 
-  while (micros() - instance_->last_clk_signal_ < 150) {
-  }
+  this->bus_message_.push_back(this->dta_pin_->digital_read() ? '0' : '1');
 
-  if (!instance_->dta_pin_->digital_read())
-    instance_->bus_message_ += "1";
-  else
-    instance_->bus_message_ += "0";
-
-  instance_->clk_pin_triggered_ = false;
-
-  if (instance_->bus_message_.length() > 200) {
-    instance_->bus_message_ = "";
+  if (this->bus_message_.length() > 200) {
+    this->bus_message_.clear();
+    ESP_LOGW(TAG, "Dropped COMBUS frame buffer due to overflow");
     return;
   }
 }
@@ -60,27 +54,22 @@ void ParadoxCombusComponent::connect_combus_() {
   this->clk_pin_->pin_mode(gpio::FLAG_INPUT);
   this->dta_pin_->pin_mode(gpio::FLAG_INPUT);
 
-  attachInterrupt(this->clk_pin_->get_pin(), &ParadoxCombusComponent::interrupt_clock_falling_, FALLING);
-  timer1_attachInterrupt(&ParadoxCombusComponent::read_data_pin_);
-  timer1_enable(TIM_DIV16, TIM_EDGE, TIM_SINGLE);
+  this->last_clk_state_ = this->clk_pin_->digital_read();
+  this->sample_pending_ = false;
+  this->last_clk_signal_ = micros();
+  this->bus_message_.clear();
 
   this->combus_connection_status_ = true;
-  ESP_LOGI(TAG, "COMBUS initialized");
+  ESP_LOGI(TAG, "COMBUS initialized in polling mode");
 }
 
 void ParadoxCombusComponent::disconnect_combus_() {
-  timer1_disable();
-  timer1_detachInterrupt();
-
-  if (this->clk_pin_ != nullptr) {
-    detachInterrupt(this->clk_pin_->get_pin());
-  }
-
+  this->sample_pending_ = false;
+  this->bus_message_.clear();
   this->combus_connection_status_ = false;
 }
 
 void ParadoxCombusComponent::setup() {
-  instance_ = this;
   this->connect_combus_();
 }
 
@@ -109,17 +98,24 @@ void ParadoxCombusComponent::loop() {
     return;
   }
 
+  this->capture_combus_bits_();
+
   if (!this->check_clock_idle_() || this->bus_message_.length() < 2) {
     return;
   }
 
-  String message = this->bus_message_;
-  this->bus_message_ = "";
+  String message = this->bus_message_.c_str();
+  this->bus_message_.clear();
 
   this->decode_message_(message);
 }
 
 void ParadoxCombusComponent::process_zone_status_(String &msg) {
+  if (msg.length() < 17 + (32 * 2)) {
+    ESP_LOGW(TAG, "Zone frame too short: %u bits", msg.length());
+    return;
+  }
+
   for (int i = 0; i < 32; i++) {
     bool open = msg[17 + (i * 2)] == '1';
     this->publish_zone_state_(i + 1, open);
@@ -127,6 +123,11 @@ void ParadoxCombusComponent::process_zone_status_(String &msg) {
 }
 
 void ParadoxCombusComponent::process_alarm_status_(String &msg) {
+  if (msg.length() <= ((8 * 7) + 1)) {
+    ESP_LOGW(TAG, "Alarm frame too short: %u bits", msg.length());
+    return;
+  }
+
   if (msg[((8 * 7) + 1)] == '0') {
     if (msg[((8 * 2) + 5)] == '1') {
       this->publish_alarm_state_(STATUS_STAY);
@@ -149,6 +150,10 @@ void ParadoxCombusComponent::process_alarm_status_(String &msg) {
 }
 
 void ParadoxCombusComponent::decode_message_(String &msg) {
+  if (msg.length() < 8) {
+    return;
+  }
+
   int cmd = get_int_from_string_(msg.substring(0, 8));
 
   if (cmd == 0xD0 || cmd == 0xD1) {
@@ -193,6 +198,9 @@ uint8_t ParadoxCombusComponent::crc8_(uint8_t *addr, uint8_t len) {
 
 uint8_t ParadoxCombusComponent::check_crc_(String &st) {
   int bytes = (st.length()) / 8;
+  if (bytes < 2) {
+    return false;
+  }
   uint8_t calc_crc_byte;
 
   uint8_t *binary_str = str_to_bin_array_(st);

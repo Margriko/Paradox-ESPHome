@@ -6,6 +6,7 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 
 #include <array>
+#include <string>
 
 namespace esphome {
 namespace paradox_combus {
@@ -41,9 +42,7 @@ class ParadoxCombusComponent : public Component {
 
   void publish_alarm_state_(const std::string &value);
   void publish_zone_state_(uint8_t zone, bool open);
-
-  static void IRAM_ATTR interrupt_clock_falling_();
-  static void IRAM_ATTR read_data_pin_();
+  void capture_combus_bits_();
 
   InternalGPIOPin *clk_pin_{nullptr};
   InternalGPIOPin *dta_pin_{nullptr};
@@ -51,9 +50,11 @@ class ParadoxCombusComponent : public Component {
   std::array<binary_sensor::BinarySensor *, 32> zone_sensors_{};
   text_sensor::TextSensor *alarm_status_sensor_{nullptr};
 
-  String bus_message_;
-  volatile unsigned long last_clk_signal_{0};
-  volatile bool clk_pin_triggered_{false};
+  std::string bus_message_;
+  bool last_clk_state_{true};
+  bool sample_pending_{false};
+  unsigned long pending_sample_at_{0};
+  unsigned long last_clk_signal_{0};
   bool combus_connection_status_{false};
 
   const std::string STATUS_UNAVAILABLE = "unavailable";
@@ -61,8 +62,6 @@ class ParadoxCombusComponent : public Component {
   const std::string STATUS_SLEEP = "armed_night";
   const std::string STATUS_STAY = "armed_home";
   const std::string STATUS_OFF = "disarmed";
-
-  static ParadoxCombusComponent *instance_;
 };
 
 }  // namespace paradox_combus
