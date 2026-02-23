@@ -7,8 +7,38 @@ namespace paradox_combus {
 
 static const char *const TAG = "paradox_combus";
 
+
+uint32_t ParadoxAlarmControlPanel::get_supported_features() const {
+  uint32_t features = 0;
+
+  if (this->parent_ == nullptr) {
+    return features;
+  }
+
+  if (this->parent_->supports_arm_home()) {
+    features |= 1U;
+  }
+  if (this->parent_->supports_arm_away()) {
+    features |= 1U << 1;
+  }
+  if (this->parent_->supports_arm_night()) {
+    features |= 1U << 2;
+  }
+
+  return features;
+}
+
+bool ParadoxAlarmControlPanel::get_requires_code() const { return true; }
+
+bool ParadoxAlarmControlPanel::get_requires_code_to_arm() const { return true; }
+
 void ParadoxAlarmControlPanel::control(const alarm_control_panel::AlarmControlPanelCall &call) {
   if (this->parent_ == nullptr || !call.get_state().has_value()) {
+    return;
+  }
+
+  if (!call.get_code().has_value() || call.get_code()->empty()) {
+    ESP_LOGW(TAG, "Ignoring alarm command without code");
     return;
   }
 

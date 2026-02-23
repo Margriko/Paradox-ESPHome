@@ -22,6 +22,9 @@ class ParadoxAlarmControlPanel : public alarm_control_panel::AlarmControlPanel {
   void set_parent(ParadoxCombusComponent *parent) { this->parent_ = parent; }
 
  protected:
+  uint32_t get_supported_features() const override;
+  bool get_requires_code() const override;
+  bool get_requires_code_to_arm() const override;
   void control(const alarm_control_panel::AlarmControlPanelCall &call) override;
   ParadoxCombusComponent *parent_{nullptr};
 };
@@ -46,6 +49,11 @@ class ParadoxCombusComponent : public Component {
   void request_arm_home();
   void request_arm_away();
   void request_arm_night();
+
+  bool supports_disarm() const { return !this->disarm_sequence_.empty(); }
+  bool supports_arm_home() const { return !this->arm_home_sequence_.empty(); }
+  bool supports_arm_away() const { return !this->arm_away_sequence_.empty(); }
+  bool supports_arm_night() const { return !this->arm_night_sequence_.empty(); }
 
   void setup() override;
   void loop() override;
