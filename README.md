@@ -73,10 +73,15 @@ alarm_control_panel:
     paradox_combus_id: combus
     name: "Alarm"
     disarm_sequence: [0x31, 0x32, 0x33, 0x34]
+    codes:
+      - "1234"
     arm_home_sequence: [0x53]
     arm_away_sequence: [0x41]
     arm_night_sequence: [0x4E]
 ```
+
+`codes` uses the same structure as the ESPHome template alarm control panel and is used to validate arm/disarm actions.
+If `disarm_sequence` is omitted, the entered code is sent as keypad digits for disarm.
 
 For a full multi-zone example, see `alarm-example.yaml`.
 

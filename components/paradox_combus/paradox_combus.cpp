@@ -28,32 +28,36 @@ uint32_t ParadoxAlarmControlPanel::get_supported_features() const {
   return features;
 }
 
-bool ParadoxAlarmControlPanel::get_requires_code() const { return true; }
+bool ParadoxAlarmControlPanel::get_requires_code() const {
+  return this->parent_ != nullptr && this->parent_->requires_code();
+}
 
-bool ParadoxAlarmControlPanel::get_requires_code_to_arm() const { return true; }
+bool ParadoxAlarmControlPanel::get_requires_code_to_arm() const {
+  return this->parent_ != nullptr && this->parent_->requires_code();
+}
 
 void ParadoxAlarmControlPanel::control(const alarm_control_panel::AlarmControlPanelCall &call) {
   if (this->parent_ == nullptr || !call.get_state().has_value()) {
     return;
   }
 
-  if (!call.get_code().has_value() || call.get_code()->empty()) {
-    ESP_LOGW(TAG, "Ignoring alarm command without code");
+  if (!this->parent_->is_valid_code(call.get_code())) {
+    ESP_LOGW(TAG, "Ignoring alarm command with invalid or missing code");
     return;
   }
 
   switch (*call.get_state()) {
     case alarm_control_panel::ACP_STATE_DISARMED:
-      this->parent_->request_disarm();
+      this->parent_->request_disarm(call.get_code());
       break;
     case alarm_control_panel::ACP_STATE_ARMED_HOME:
-      this->parent_->request_arm_home();
+      this->parent_->request_arm_home(call.get_code());
       break;
     case alarm_control_panel::ACP_STATE_ARMED_AWAY:
-      this->parent_->request_arm_away();
+      this->parent_->request_arm_away(call.get_code());
       break;
     case alarm_control_panel::ACP_STATE_ARMED_NIGHT:
-      this->parent_->request_arm_night();
+      this->parent_->request_arm_night(call.get_code());
       break;
     default:
       ESP_LOGW(TAG, "Requested alarm state is not currently mapped to COMBUS write sequence");
@@ -115,13 +119,65 @@ void ParadoxCombusComponent::queue_write_sequence_(const std::vector<uint8_t> &s
            static_cast<unsigned>(this->tx_bits_.size()));
 }
 
-void ParadoxCombusComponent::request_disarm() { this->queue_write_sequence_(this->disarm_sequence_); }
+bool ParadoxCombusComponent::is_valid_code(const optional<std::string> &code) const {
+  if (this->codes_.empty()) {
+    return true;
+  }
 
-void ParadoxCombusComponent::request_arm_home() { this->queue_write_sequence_(this->arm_home_sequence_); }
+  if (!code.has_value()) {
+    return false;
+  }
 
-void ParadoxCombusComponent::request_arm_away() { this->queue_write_sequence_(this->arm_away_sequence_); }
+  for (const auto &configured_code : this->codes_) {
+    if (configured_code == *code) {
+      return true;
+    }
+  }
 
-void ParadoxCombusComponent::request_arm_night() { this->queue_write_sequence_(this->arm_night_sequence_); }
+  return false;
+}
+
+std::vector<uint8_t> ParadoxCombusComponent::code_to_sequence_(const optional<std::string> &code) const {
+  std::vector<uint8_t> sequence;
+  if (!code.has_value()) {
+    return sequence;
+  }
+
+  for (char value : *code) {
+    if (value >= '0' && value <= '9') {
+      sequence.push_back(static_cast<uint8_t>(value));
+    }
+  }
+
+  return sequence;
+}
+
+void ParadoxCombusComponent::request_disarm(const optional<std::string> &code) {
+  if (!this->disarm_sequence_.empty()) {
+    this->queue_write_sequence_(this->disarm_sequence_);
+    return;
+  }
+
+  this->queue_write_sequence_(this->code_to_sequence_(code));
+}
+
+void ParadoxCombusComponent::request_arm_home(const optional<std::string> &code) {
+  std::vector<uint8_t> sequence = this->code_to_sequence_(code);
+  sequence.insert(sequence.end(), this->arm_home_sequence_.begin(), this->arm_home_sequence_.end());
+  this->queue_write_sequence_(sequence);
+}
+
+void ParadoxCombusComponent::request_arm_away(const optional<std::string> &code) {
+  std::vector<uint8_t> sequence = this->code_to_sequence_(code);
+  sequence.insert(sequence.end(), this->arm_away_sequence_.begin(), this->arm_away_sequence_.end());
+  this->queue_write_sequence_(sequence);
+}
+
+void ParadoxCombusComponent::request_arm_night(const optional<std::string> &code) {
+  std::vector<uint8_t> sequence = this->code_to_sequence_(code);
+  sequence.insert(sequence.end(), this->arm_night_sequence_.begin(), this->arm_night_sequence_.end());
+  this->queue_write_sequence_(sequence);
+}
 
 void ParadoxCombusComponent::process_pending_bus_writes_() {
   if (this->clk_pin_ == nullptr || this->dta_pin_ == nullptr) {

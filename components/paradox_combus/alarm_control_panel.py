@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import alarm_control_panel
-from esphome.const import CONF_ID
+from esphome.const import CONF_CODES, CONF_ID
 
 from . import ParadoxAlarmControlPanel, ParadoxCombusComponent
 
@@ -14,6 +14,13 @@ CONF_ARM_AWAY_SEQUENCE = "arm_away_sequence"
 CONF_ARM_NIGHT_SEQUENCE = "arm_night_sequence"
 
 
+def _validate_code(value):
+    value = cv.string(value)
+    if not value.isdigit():
+        raise cv.Invalid("Alarm code must contain digits only")
+    return value
+
+
 def _validate_non_empty(config):
     if not any(
         config.get(key)
@@ -22,11 +29,12 @@ def _validate_non_empty(config):
             CONF_ARM_HOME_SEQUENCE,
             CONF_ARM_AWAY_SEQUENCE,
             CONF_ARM_NIGHT_SEQUENCE,
+            CONF_CODES,
         )
     ):
         raise cv.Invalid(
-            "At least one write sequence must be configured (disarm_sequence/arm_home_sequence/"
-            "arm_away_sequence/arm_night_sequence)"
+            "At least one write/control field must be configured (disarm_sequence/arm_home_sequence/"
+            "arm_away_sequence/arm_night_sequence/codes)"
         )
     return config
 
@@ -39,6 +47,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_ARM_HOME_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
             cv.Optional(CONF_ARM_AWAY_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
             cv.Optional(CONF_ARM_NIGHT_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
+            cv.Optional(CONF_CODES): cv.ensure_list(_validate_code),
         }
     ),
     _validate_non_empty,
@@ -61,3 +70,5 @@ async def to_code(config):
         cg.add(hub.set_arm_away_sequence(config[CONF_ARM_AWAY_SEQUENCE]))
     if CONF_ARM_NIGHT_SEQUENCE in config:
         cg.add(hub.set_arm_night_sequence(config[CONF_ARM_NIGHT_SEQUENCE]))
+    if CONF_CODES in config:
+        cg.add(hub.set_codes(config[CONF_CODES]))
