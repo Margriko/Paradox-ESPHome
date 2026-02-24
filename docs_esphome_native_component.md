@@ -53,17 +53,15 @@ alarm_control_panel:
   - platform: paradox_combus
     paradox_combus_id: combus
     name: "Alarm"
-    disarm_sequence: [0x31, 0x32, 0x33, 0x34]
-    codes:
-      - "1234"
-    arm_home_sequence: [0x53]
-    arm_away_sequence: [0x41]
-    arm_night_sequence: [0x4E]
+    disarm_sequence: "1234"
+    arm_home_sequence: "S"
+    arm_away_sequence: "A"
+    arm_night_sequence: "N"
 ```
 
 - No write config is required if you only need alarm status/state in Home Assistant.
-- `codes` follows the same structure as template alarm and is used to validate both arm and disarm commands.
-- If `disarm_sequence` is omitted, the entered code is sent as keypad digits for disarm; arm modes send `code + arm_*_sequence`.
+- `disarm_sequence` and `arm_*_sequence` can be provided either as ASCII strings (e.g. `"1234"`, `"A"`) or hex-byte lists.
+- If your panel requires entering a code before arming, Home Assistant `code` is still prepended to each `arm_*_sequence`.
 - Sequences are raw bytes transmitted LSB-first on COMBUS and are panel-specific.
 - The implementation is experimental and intended as a starting point for tuning against your panel.
 

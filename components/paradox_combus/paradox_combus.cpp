@@ -41,10 +41,6 @@ void ParadoxAlarmControlPanel::control(const alarm_control_panel::AlarmControlPa
     return;
   }
 
-  if (!this->parent_->is_valid_code(call.get_code())) {
-    ESP_LOGW(TAG, "Ignoring alarm command with invalid or missing code");
-    return;
-  }
 
   switch (*call.get_state()) {
     case alarm_control_panel::ACP_STATE_DISARMED:
@@ -117,24 +113,6 @@ void ParadoxCombusComponent::queue_write_sequence_(const std::vector<uint8_t> &s
 
   ESP_LOGD(TAG, "Queued COMBUS write sequence (%u bytes, %u bits pending)", static_cast<unsigned>(sequence.size()),
            static_cast<unsigned>(this->tx_bits_.size()));
-}
-
-bool ParadoxCombusComponent::is_valid_code(const optional<std::string> &code) const {
-  if (this->codes_.empty()) {
-    return true;
-  }
-
-  if (!code.has_value()) {
-    return false;
-  }
-
-  for (const auto &configured_code : this->codes_) {
-    if (configured_code == *code) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 std::vector<uint8_t> ParadoxCombusComponent::code_to_sequence_(const optional<std::string> &code) const {
