@@ -8,28 +8,28 @@ from . import ParadoxAlarmControlPanel, ParadoxCombusComponent
 DEPENDENCIES = ["paradox_combus"]
 
 CONF_PARADOX_COMBUS_ID = "paradox_combus_id"
-CONF_CODES = "codes"
 CONF_DISARM_SEQUENCE = "disarm_sequence"
 CONF_ARM_HOME_SEQUENCE = "arm_home_sequence"
 CONF_ARM_AWAY_SEQUENCE = "arm_away_sequence"
 CONF_ARM_NIGHT_SEQUENCE = "arm_night_sequence"
 
 
-def _validate_code(value):
-    value = cv.string(value)
-    if not value.isdigit():
-        raise cv.Invalid("Alarm code must contain digits only")
-    return value
+def _validate_ascii_sequence(value):
+    if isinstance(value, str):
+        if any(ord(char) > 0x7F for char in value):
+            raise cv.Invalid("Sequence string can only contain ASCII characters")
+        return [ord(char) for char in value]
+
+    return cv.ensure_list(cv.hex_uint8_t)(value)
 
 
 CONFIG_SCHEMA = alarm_control_panel.alarm_control_panel_schema(ParadoxAlarmControlPanel).extend(
     {
         cv.GenerateID(CONF_PARADOX_COMBUS_ID): cv.use_id(ParadoxCombusComponent),
-        cv.Optional(CONF_DISARM_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
-        cv.Optional(CONF_ARM_HOME_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
-        cv.Optional(CONF_ARM_AWAY_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
-        cv.Optional(CONF_ARM_NIGHT_SEQUENCE): cv.ensure_list(cv.hex_uint8_t),
-        cv.Optional(CONF_CODES): cv.ensure_list(_validate_code),
+        cv.Optional(CONF_DISARM_SEQUENCE): _validate_ascii_sequence,
+        cv.Optional(CONF_ARM_HOME_SEQUENCE): _validate_ascii_sequence,
+        cv.Optional(CONF_ARM_AWAY_SEQUENCE): _validate_ascii_sequence,
+        cv.Optional(CONF_ARM_NIGHT_SEQUENCE): _validate_ascii_sequence,
     }
 )
 
@@ -50,5 +50,3 @@ async def to_code(config):
         cg.add(hub.set_arm_away_sequence(config[CONF_ARM_AWAY_SEQUENCE]))
     if CONF_ARM_NIGHT_SEQUENCE in config:
         cg.add(hub.set_arm_night_sequence(config[CONF_ARM_NIGHT_SEQUENCE]))
-    if CONF_CODES in config:
-        cg.add(hub.set_codes(config[CONF_CODES]))

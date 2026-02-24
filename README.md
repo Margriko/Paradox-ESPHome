@@ -62,16 +62,14 @@ alarm_control_panel:
     paradox_combus_id: combus
     name: "Alarm"
     # Optional write-path configuration:
-    disarm_sequence: [0x31, 0x32, 0x33, 0x34]
-    codes:
-      - "1234"
-    arm_home_sequence: [0x53]
-    arm_away_sequence: [0x41]
-    arm_night_sequence: [0x4E]
+    disarm_sequence: "1234"
+    arm_home_sequence: "S"
+    arm_away_sequence: "A"
+    arm_night_sequence: "N"
 ```
 
-`codes` uses the same structure as the ESPHome template alarm control panel and is used to validate arm/disarm actions.
-If `disarm_sequence` is omitted, the entered code is sent as keypad digits for disarm.
+`disarm_sequence` now accepts an ASCII string (for example `"1234"`) in addition to raw hex bytes.
+If `disarm_sequence` is omitted, disarm is not exposed as a writable feature.
 
 For a full multi-zone example, see `alarm-example.yaml`.
 
