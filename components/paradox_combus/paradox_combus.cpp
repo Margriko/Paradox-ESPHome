@@ -250,7 +250,7 @@ void ParadoxCombusComponent::connect_combus_() {
   this->bus_message_.clear();
 
   this->combus_connection_status_ = true;
-  ESP_LOGI(TAG, "COMBUS initialized in polling mode");
+  ESP_LOGI(TAG, "COMBUS initialized in polling mode (frame_idle_us=%u)", static_cast<unsigned>(this->frame_idle_us_));
 }
 
 void ParadoxCombusComponent::disconnect_combus_() {
@@ -494,7 +494,7 @@ bool ParadoxCombusComponent::check_clock_idle_() {
   unsigned long current_micros = micros();
   long idletime = (current_micros - this->last_clk_signal_);
 
-  if (idletime > 8000) {
+  if (idletime > static_cast<long>(this->frame_idle_us_)) {
     return true;
   } else {
     return false;

@@ -35,6 +35,7 @@ class ParadoxCombusComponent : public Component {
   void set_clk_pin(InternalGPIOPin *pin) { this->clk_pin_ = pin; }
   void set_read_pin(InternalGPIOPin *pin) { this->read_pin_ = pin; }
   void set_write_pin(GPIOPin *pin) { this->write_pin_ = pin; }
+  void set_frame_idle_us(uint32_t frame_idle_us) { this->frame_idle_us_ = frame_idle_us; }
 
   void register_zone_sensor(uint8_t zone, binary_sensor::BinarySensor *sensor);
   void set_alarm_control_panel(ParadoxAlarmControlPanel *panel) { this->alarm_control_panel_ = panel; }
@@ -113,6 +114,7 @@ class ParadoxCombusComponent : public Component {
   uint32_t malformed_d1_d0_frames_{0};
   std::string last_crc_fail_preview_;
   uint8_t last_crc_fail_cmd_{0};
+  uint32_t frame_idle_us_{25000};
   bool combus_connection_status_{false};
 
 };

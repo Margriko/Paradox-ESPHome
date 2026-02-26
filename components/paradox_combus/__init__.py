@@ -14,6 +14,7 @@ CONF_CLK_PIN = "clk_pin"
 CONF_DTA_PIN = "dta_pin"
 CONF_READ_PIN = "read_pin"
 CONF_WRITE_PIN = "write_pin"
+CONF_FRAME_IDLE_US = "frame_idle_us"
 
 BASE_SCHEMA = cv.Schema(
     {
@@ -22,6 +23,7 @@ BASE_SCHEMA = cv.Schema(
         cv.Optional(CONF_DTA_PIN): pins.internal_gpio_input_pin_schema,
         cv.Optional(CONF_READ_PIN): pins.internal_gpio_input_pin_schema,
         cv.Optional(CONF_WRITE_PIN): pins.internal_gpio_output_pin_schema,
+        cv.Optional(CONF_FRAME_IDLE_US, default=25000): cv.int_range(min=2000, max=200000),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -49,6 +51,7 @@ async def to_code(config):
 
     clk = await cg.gpio_pin_expression(config[CONF_CLK_PIN])
     cg.add(var.set_clk_pin(clk))
+    cg.add(var.set_frame_idle_us(config[CONF_FRAME_IDLE_US]))
 
     if CONF_DTA_PIN in config:
         dta = await cg.gpio_pin_expression(config[CONF_DTA_PIN])

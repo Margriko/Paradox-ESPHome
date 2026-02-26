@@ -31,6 +31,8 @@ components/
 paradox_combus:
   id: combus
   clk_pin: D1
+  # Optional frame boundary idle timeout in microseconds.
+  frame_idle_us: 25000
   # Legacy single data pin (shared read/write):
   # dta_pin: D2
   # 3-channel optocoupler (clock + read + write):
