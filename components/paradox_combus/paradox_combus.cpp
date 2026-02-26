@@ -255,13 +255,13 @@ void ParadoxCombusComponent::loop() {
     return;
   }
 
-  String message = this->bus_message_.c_str();
+  std::string message = this->bus_message_;
   this->bus_message_.clear();
 
   this->decode_message_(message);
 }
 
-void ParadoxCombusComponent::process_zone_status_(String &msg) {
+void ParadoxCombusComponent::process_zone_status_(const std::string &msg) {
   if (msg.length() < 17 + (32 * 2)) {
     ESP_LOGW(TAG, "Zone frame too short: %u bits", msg.length());
     return;
@@ -273,7 +273,7 @@ void ParadoxCombusComponent::process_zone_status_(String &msg) {
   }
 }
 
-void ParadoxCombusComponent::process_alarm_status_(String &msg) {
+void ParadoxCombusComponent::process_alarm_status_(const std::string &msg) {
   if (msg.length() <= ((8 * 7) + 1)) {
     ESP_LOGW(TAG, "Alarm frame too short: %u bits", msg.length());
     return;
@@ -300,15 +300,15 @@ void ParadoxCombusComponent::process_alarm_status_(String &msg) {
   }
 }
 
-void ParadoxCombusComponent::decode_message_(String &msg) {
+void ParadoxCombusComponent::decode_message_(std::string &msg) {
   if (msg.length() < 8) {
     return;
   }
 
-  int cmd = get_int_from_string_(msg.substring(0, 8));
+  int cmd = get_int_from_string_(msg.substr(0, 8));
 
   if (cmd == 0xD0 || cmd == 0xD1) {
-    msg = msg.substring(0, msg.length() - (4 * 8) - 1);
+    msg = msg.substr(0, msg.length() - (4 * 8) - 1);
     if (!check_crc_(msg)) {
       return;
     }
@@ -330,7 +330,7 @@ void ParadoxCombusComponent::decode_message_(String &msg) {
   }
 }
 
-uint8_t ParadoxCombusComponent::crc8_(uint8_t *addr, uint8_t len) {
+uint8_t ParadoxCombusComponent::crc8_(const uint8_t *addr, uint8_t len) {
   uint8_t crc = 0;
 
   for (uint8_t i = 0; i < len; i++) {
@@ -347,21 +347,16 @@ uint8_t ParadoxCombusComponent::crc8_(uint8_t *addr, uint8_t len) {
   return crc;
 }
 
-uint8_t ParadoxCombusComponent::check_crc_(String &st) {
+uint8_t ParadoxCombusComponent::check_crc_(const std::string &st) {
   int bytes = (st.length()) / 8;
   if (bytes < 2) {
     return false;
   }
-  uint8_t calc_crc_byte;
+  const std::vector<uint8_t> binary_str = str_to_bin_array_(st);
 
-  uint8_t *binary_str = str_to_bin_array_(st);
-
-  uint8_t crc = binary_str[bytes - 1];
-  calc_crc_byte = crc8_(binary_str, (int) bytes - 1);
-  bool valid = calc_crc_byte == crc;
-
-  delete[] binary_str;
-  return valid;
+  const uint8_t crc = binary_str[bytes - 1];
+  const uint8_t calc_crc_byte = crc8_(binary_str.data(), bytes - 1);
+  return calc_crc_byte == crc;
 }
 
 bool ParadoxCombusComponent::check_clock_idle_() {
@@ -375,7 +370,7 @@ bool ParadoxCombusComponent::check_clock_idle_() {
   }
 }
 
-unsigned int ParadoxCombusComponent::get_int_from_string_(String str) {
+unsigned int ParadoxCombusComponent::get_int_from_string_(const std::string &str) {
   int r = 0;
   int length = str.length();
 
@@ -388,14 +383,12 @@ unsigned int ParadoxCombusComponent::get_int_from_string_(String str) {
   return r;
 }
 
-uint8_t *ParadoxCombusComponent::str_to_bin_array_(String &st) {
-  int bytes = (st.length()) / 8;
-  auto *data = new uint8_t[bytes];
-
-  String val = "";
+std::vector<uint8_t> ParadoxCombusComponent::str_to_bin_array_(const std::string &st) {
+  const int bytes = st.length() / 8;
+  std::vector<uint8_t> data(bytes);
 
   for (int i = 0; i < bytes; i++) {
-    val = st.substring((i * 8), ((i * 8)) + 8);
+    const std::string val = st.substr(i * 8, 8);
     data[i] = get_int_from_string_(val);
   }
 

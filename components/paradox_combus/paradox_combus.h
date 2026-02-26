@@ -64,15 +64,15 @@ class ParadoxCombusComponent : public Component {
   void disconnect_combus_();
   bool get_combus_connection_status_() const { return this->combus_connection_status_; }
 
-  void process_zone_status_(String &msg);
-  void process_alarm_status_(String &msg);
-  void decode_message_(String &msg);
+  void process_zone_status_(const std::string &msg);
+  void process_alarm_status_(const std::string &msg);
+  void decode_message_(std::string &msg);
 
-  uint8_t crc8_(uint8_t *addr, uint8_t len);
-  uint8_t check_crc_(String &st);
+  uint8_t crc8_(const uint8_t *addr, uint8_t len);
+  uint8_t check_crc_(const std::string &st);
   bool check_clock_idle_();
-  unsigned int get_int_from_string_(String str);
-  uint8_t *str_to_bin_array_(String &st);
+  unsigned int get_int_from_string_(const std::string &str);
+  std::vector<uint8_t> str_to_bin_array_(const std::string &st);
 
   void publish_zone_state_(uint8_t zone, bool open);
   void publish_alarm_control_panel_state_(alarm_control_panel::AlarmControlPanelState state);
