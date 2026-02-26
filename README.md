@@ -26,7 +26,7 @@ Wiring example:
 
 ## Native ESPHome component usage
 
-This repository now includes a native ESPHome **external component** (`components/paradox_combus`) that exposes:
+This repository now includes a native ESPHome **external component** (`components/paradox_combus`) that exposes (including optional split read/write data pins for 3-channel optocoupler modules):
 
 - ESP8266/ESP32-compatible COMBUS reader implemented as a native polling loop (no timer/interrupt dependency)
 
@@ -48,7 +48,11 @@ external_components:
 paradox_combus:
   id: combus
   clk_pin: D1
-  dta_pin: D2
+  # Legacy/shared data line (single pin for read+write):
+  # dta_pin: D2
+  # 3-channel optocoupler wiring (recommended for PC817 modules):
+  read_pin: D2
+  write_pin: D3
 
 binary_sensor:
   - platform: paradox_combus
