@@ -70,7 +70,7 @@ void ParadoxCombusComponent::register_zone_sensor(uint8_t zone, binary_sensor::B
 }
 
 void ParadoxCombusComponent::capture_combus_bits_() {
-  if (this->clk_pin_ == nullptr || this->dta_pin_ == nullptr) {
+  if (this->clk_pin_ == nullptr || this->read_pin_ == nullptr) {
     return;
   }
 
@@ -90,7 +90,7 @@ void ParadoxCombusComponent::capture_combus_bits_() {
 
   this->sample_pending_ = false;
 
-  this->bus_message_.push_back(this->dta_pin_->digital_read() ? '0' : '1');
+  this->bus_message_.push_back(this->read_pin_->digital_read() ? '0' : '1');
 
   if (this->bus_message_.length() > 200) {
     this->bus_message_.clear();
@@ -158,13 +158,13 @@ void ParadoxCombusComponent::request_arm_night(const optional<std::string> &code
 }
 
 void ParadoxCombusComponent::process_pending_bus_writes_() {
-  if (this->clk_pin_ == nullptr || this->dta_pin_ == nullptr) {
+  if (this->clk_pin_ == nullptr || this->write_pin_ == nullptr) {
     return;
   }
 
   if (this->tx_bits_.empty()) {
     if (this->tx_drive_low_) {
-      this->dta_pin_->pin_mode(gpio::FLAG_INPUT);
+      this->write_pin_->pin_mode(gpio::FLAG_INPUT);
       this->tx_drive_low_ = false;
     }
     return;
@@ -177,24 +177,28 @@ void ParadoxCombusComponent::process_pending_bus_writes_() {
 
     // COMBUS uses open collector signalling: logical '1' is driven low, logical '0' is release.
     if (write_bit) {
-      this->dta_pin_->pin_mode(gpio::FLAG_OUTPUT);
-      this->dta_pin_->digital_write(false);
+      this->write_pin_->pin_mode(gpio::FLAG_OUTPUT);
+      this->write_pin_->digital_write(false);
       this->tx_drive_low_ = true;
     } else {
-      this->dta_pin_->pin_mode(gpio::FLAG_INPUT);
+      this->write_pin_->pin_mode(gpio::FLAG_INPUT);
       this->tx_drive_low_ = false;
     }
   }
 }
 
 void ParadoxCombusComponent::connect_combus_() {
-  if (this->clk_pin_ == nullptr || this->dta_pin_ == nullptr) {
-    ESP_LOGE(TAG, "clk_pin and dta_pin are required");
+  if (this->clk_pin_ == nullptr || this->read_pin_ == nullptr) {
+    ESP_LOGE(TAG, "clk_pin and read_pin are required");
     return;
   }
 
   this->clk_pin_->pin_mode(gpio::FLAG_INPUT);
-  this->dta_pin_->pin_mode(gpio::FLAG_INPUT);
+  this->read_pin_->pin_mode(gpio::FLAG_INPUT);
+  if (this->write_pin_ == nullptr) {
+    this->write_pin_ = this->read_pin_;
+  }
+  this->write_pin_->pin_mode(gpio::FLAG_INPUT);
 
   this->last_clk_state_ = this->clk_pin_->digital_read();
   this->sample_pending_ = false;
@@ -208,7 +212,9 @@ void ParadoxCombusComponent::connect_combus_() {
 void ParadoxCombusComponent::disconnect_combus_() {
   this->sample_pending_ = false;
   this->tx_bits_.clear();
-  this->dta_pin_->pin_mode(gpio::FLAG_INPUT);
+  if (this->write_pin_ != nullptr) {
+    this->write_pin_->pin_mode(gpio::FLAG_INPUT);
+  }
   this->tx_drive_low_ = false;
   this->bus_message_.clear();
   this->combus_connection_status_ = false;

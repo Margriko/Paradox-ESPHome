@@ -35,7 +35,11 @@ status_led:
 paradox_combus:
   id: combus
   clk_pin: D1
-  dta_pin: D2
+  # Legacy/shared data pin:
+  # dta_pin: D2
+  # 3-channel optocoupler wiring:
+  read_pin: D2
+  write_pin: D3
 
 binary_sensor:
   - platform: paradox_combus
