@@ -1,11 +1,40 @@
 #include "paradox_combus.h"
 
+#include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
+
+#include <sstream>
 
 namespace esphome {
 namespace paradox_combus {
 
 static const char *const TAG = "paradox_combus";
+
+namespace {
+
+std::string format_sequence_bytes(const std::vector<uint8_t> &sequence) {
+  std::ostringstream stream;
+  stream << "[";
+  for (size_t i = 0; i < sequence.size(); i++) {
+    if (i > 0) {
+      stream << " ";
+    }
+    stream << str_sprintf("0x%02X", sequence[i]);
+  }
+  stream << "]";
+  return stream.str();
+}
+
+std::string format_bits_preview(const std::string &bits, size_t max_bits = 96) {
+  if (bits.length() <= max_bits) {
+    return bits;
+  }
+
+  return str_sprintf("%s...(+%u bits)", bits.substr(0, max_bits).c_str(),
+                     static_cast<unsigned>(bits.length() - max_bits));
+}
+
+}  // namespace
 
 
 uint32_t ParadoxAlarmControlPanel::get_supported_features() const {
@@ -111,8 +140,9 @@ void ParadoxCombusComponent::queue_write_sequence_(const std::vector<uint8_t> &s
     }
   }
 
-  ESP_LOGD(TAG, "Queued COMBUS write sequence (%u bytes, %u bits pending)", static_cast<unsigned>(sequence.size()),
-           static_cast<unsigned>(this->tx_bits_.size()));
+  ESP_LOGD(TAG, "TX queued COMBUS packet (%u bytes): %s", static_cast<unsigned>(sequence.size()),
+           format_sequence_bytes(sequence).c_str());
+  ESP_LOGD(TAG, "TX queue depth is now %u bits", static_cast<unsigned>(this->tx_bits_.size()));
 }
 
 std::vector<uint8_t> ParadoxCombusComponent::code_to_sequence_(const optional<std::string> &code) const {
@@ -307,16 +337,24 @@ void ParadoxCombusComponent::decode_message_(std::string &msg) {
 
   int cmd = get_int_from_string_(msg.substr(0, 8));
 
+  ESP_LOGD(TAG, "RX raw COMBUS frame (%u bits, cmd=0x%02X): %s", static_cast<unsigned>(msg.length()), cmd,
+           format_bits_preview(msg).c_str());
+
   if (cmd == 0xD0 || cmd == 0xD1) {
     msg = msg.substr(0, msg.length() - (4 * 8) - 1);
     if (!check_crc_(msg)) {
+      ESP_LOGD(TAG, "RX frame dropped: CRC mismatch for cmd 0x%02X", cmd);
       return;
     }
   } else {
     if (!check_crc_(msg)) {
+      ESP_LOGD(TAG, "RX frame dropped: CRC mismatch for cmd 0x%02X", cmd);
       return;
     }
   }
+
+  ESP_LOGD(TAG, "RX parsed COMBUS packet cmd=0x%02X (%u bits): %s", cmd, static_cast<unsigned>(msg.length()),
+           format_bits_preview(msg).c_str());
 
   switch (cmd) {
     case 0xD0:
