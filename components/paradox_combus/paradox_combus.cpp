@@ -1,11 +1,40 @@
 #include "paradox_combus.h"
 
+#include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
+
+#include <sstream>
 
 namespace esphome {
 namespace paradox_combus {
 
 static const char *const TAG = "paradox_combus";
+
+namespace {
+
+std::string format_sequence_bytes(const std::vector<uint8_t> &sequence) {
+  std::ostringstream stream;
+  stream << "[";
+  for (size_t i = 0; i < sequence.size(); i++) {
+    if (i > 0) {
+      stream << " ";
+    }
+    stream << str_sprintf("0x%02X", sequence[i]);
+  }
+  stream << "]";
+  return stream.str();
+}
+
+std::string format_bits_preview(const std::string &bits, size_t max_bits = 96) {
+  if (bits.length() <= max_bits) {
+    return bits;
+  }
+
+  return str_sprintf("%s...(+%u bits)", bits.substr(0, max_bits).c_str(),
+                     static_cast<unsigned>(bits.length() - max_bits));
+}
+
+}  // namespace
 
 
 uint32_t ParadoxAlarmControlPanel::get_supported_features() const {
@@ -81,6 +110,7 @@ void ParadoxCombusComponent::capture_combus_bits_() {
     this->last_clk_signal_ = now;
     this->pending_sample_at_ = now + 150;
     this->sample_pending_ = true;
+    this->clock_falling_edges_++;
   }
   this->last_clk_state_ = clk_state;
 
@@ -89,11 +119,13 @@ void ParadoxCombusComponent::capture_combus_bits_() {
   }
 
   this->sample_pending_ = false;
+  this->sampled_bits_++;
 
   this->bus_message_.push_back(this->read_pin_->digital_read() ? '0' : '1');
 
   if (this->bus_message_.length() > 200) {
     this->bus_message_.clear();
+    this->overflow_drop_frames_++;
     ESP_LOGW(TAG, "Dropped COMBUS frame buffer due to overflow");
     return;
   }
@@ -111,8 +143,9 @@ void ParadoxCombusComponent::queue_write_sequence_(const std::vector<uint8_t> &s
     }
   }
 
-  ESP_LOGD(TAG, "Queued COMBUS write sequence (%u bytes, %u bits pending)", static_cast<unsigned>(sequence.size()),
-           static_cast<unsigned>(this->tx_bits_.size()));
+  ESP_LOGD(TAG, "TX queued COMBUS packet (%u bytes): %s", static_cast<unsigned>(sequence.size()),
+           format_sequence_bytes(sequence).c_str());
+  ESP_LOGD(TAG, "TX queue depth is now %u bits", static_cast<unsigned>(this->tx_bits_.size()));
 }
 
 std::vector<uint8_t> ParadoxCombusComponent::code_to_sequence_(const optional<std::string> &code) const {
@@ -203,6 +236,12 @@ void ParadoxCombusComponent::connect_combus_() {
   this->last_clk_state_ = this->clk_pin_->digital_read();
   this->sample_pending_ = false;
   this->last_clk_signal_ = micros();
+  this->last_diag_log_at_ = this->last_clk_signal_;
+  this->clock_falling_edges_ = 0;
+  this->sampled_bits_ = 0;
+  this->decoded_frames_ = 0;
+  this->crc_drop_frames_ = 0;
+  this->overflow_drop_frames_ = 0;
   this->bus_message_.clear();
 
   this->combus_connection_status_ = true;
@@ -250,6 +289,7 @@ void ParadoxCombusComponent::loop() {
 
   this->capture_combus_bits_();
   this->process_pending_bus_writes_();
+  this->log_bus_diagnostics_();
 
   if (!this->check_clock_idle_() || this->bus_message_.length() < 2) {
     return;
@@ -259,6 +299,32 @@ void ParadoxCombusComponent::loop() {
   this->bus_message_.clear();
 
   this->decode_message_(message);
+}
+
+void ParadoxCombusComponent::log_bus_diagnostics_() {
+  const unsigned long now = micros();
+  if (now - this->last_diag_log_at_ < 5000000UL) {
+    return;
+  }
+
+  this->last_diag_log_at_ = now;
+  if (this->clock_falling_edges_ == 0) {
+    ESP_LOGW(TAG,
+             "No COMBUS clock edges seen in last 5s (clk=%d read=%d). Check wiring/level-shifting/opto speed.",
+             this->clk_pin_->digital_read(), this->read_pin_->digital_read());
+  } else {
+    ESP_LOGD(TAG,
+             "COMBUS diag (5s): clk_edges=%u sampled_bits=%u decoded=%u crc_drop=%u overflow_drop=%u tx_pending_bits=%u",
+             static_cast<unsigned>(this->clock_falling_edges_), static_cast<unsigned>(this->sampled_bits_),
+             static_cast<unsigned>(this->decoded_frames_), static_cast<unsigned>(this->crc_drop_frames_),
+             static_cast<unsigned>(this->overflow_drop_frames_), static_cast<unsigned>(this->tx_bits_.size()));
+  }
+
+  this->clock_falling_edges_ = 0;
+  this->sampled_bits_ = 0;
+  this->decoded_frames_ = 0;
+  this->crc_drop_frames_ = 0;
+  this->overflow_drop_frames_ = 0;
 }
 
 void ParadoxCombusComponent::process_zone_status_(const std::string &msg) {
@@ -307,16 +373,27 @@ void ParadoxCombusComponent::decode_message_(std::string &msg) {
 
   int cmd = get_int_from_string_(msg.substr(0, 8));
 
+  ESP_LOGD(TAG, "RX raw COMBUS frame (%u bits, cmd=0x%02X): %s", static_cast<unsigned>(msg.length()), cmd,
+           format_bits_preview(msg).c_str());
+
   if (cmd == 0xD0 || cmd == 0xD1) {
     msg = msg.substr(0, msg.length() - (4 * 8) - 1);
     if (!check_crc_(msg)) {
+      this->crc_drop_frames_++;
+      ESP_LOGD(TAG, "RX frame dropped: CRC mismatch for cmd 0x%02X", cmd);
       return;
     }
   } else {
     if (!check_crc_(msg)) {
+      this->crc_drop_frames_++;
+      ESP_LOGD(TAG, "RX frame dropped: CRC mismatch for cmd 0x%02X", cmd);
       return;
     }
   }
+
+  ESP_LOGD(TAG, "RX parsed COMBUS packet cmd=0x%02X (%u bits): %s", cmd, static_cast<unsigned>(msg.length()),
+           format_bits_preview(msg).c_str());
+  this->decoded_frames_++;
 
   switch (cmd) {
     case 0xD0:
