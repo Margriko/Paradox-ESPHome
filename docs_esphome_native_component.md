@@ -31,7 +31,11 @@ components/
 paradox_combus:
   id: combus
   clk_pin: D1
-  dta_pin: D2
+  # Legacy single data pin (shared read/write):
+  # dta_pin: D2
+  # 3-channel optocoupler (clock + read + write):
+  read_pin: D2
+  write_pin: D3
 ```
 
 ### Zone sensor
@@ -68,5 +72,5 @@ alarm_control_panel:
 ## Notes
 
 - The COMBUS parser/decoder remains based on the original implementation and now publishes directly to registered ESPHome entities.
-- Pin configuration moved from hardcoded C++ defines to YAML (`clk_pin`, `dta_pin`).
+- Pin configuration moved from hardcoded C++ defines to YAML (`clk_pin`, plus either legacy `dta_pin` or split `read_pin`/`write_pin`).
 - Existing sample configuration was migrated to this new format in `alarm.yaml`.

@@ -33,7 +33,8 @@ class ParadoxZoneBinarySensor : public binary_sensor::BinarySensor {};
 class ParadoxCombusComponent : public Component {
  public:
   void set_clk_pin(InternalGPIOPin *pin) { this->clk_pin_ = pin; }
-  void set_dta_pin(InternalGPIOPin *pin) { this->dta_pin_ = pin; }
+  void set_read_pin(InternalGPIOPin *pin) { this->read_pin_ = pin; }
+  void set_write_pin(GPIOPin *pin) { this->write_pin_ = pin; }
 
   void register_zone_sensor(uint8_t zone, binary_sensor::BinarySensor *sensor);
   void set_alarm_control_panel(ParadoxAlarmControlPanel *panel) { this->alarm_control_panel_ = panel; }
@@ -63,15 +64,15 @@ class ParadoxCombusComponent : public Component {
   void disconnect_combus_();
   bool get_combus_connection_status_() const { return this->combus_connection_status_; }
 
-  void process_zone_status_(String &msg);
-  void process_alarm_status_(String &msg);
-  void decode_message_(String &msg);
+  void process_zone_status_(const std::string &msg);
+  void process_alarm_status_(const std::string &msg);
+  void decode_message_(std::string &msg);
 
-  uint8_t crc8_(uint8_t *addr, uint8_t len);
-  uint8_t check_crc_(String &st);
+  uint8_t crc8_(const uint8_t *addr, uint8_t len);
+  uint8_t check_crc_(const std::string &st);
   bool check_clock_idle_();
-  unsigned int get_int_from_string_(String str);
-  uint8_t *str_to_bin_array_(String &st);
+  unsigned int get_int_from_string_(const std::string &str);
+  std::vector<uint8_t> str_to_bin_array_(const std::string &st);
 
   void publish_zone_state_(uint8_t zone, bool open);
   void publish_alarm_control_panel_state_(alarm_control_panel::AlarmControlPanelState state);
@@ -81,7 +82,8 @@ class ParadoxCombusComponent : public Component {
   void queue_write_sequence_(const std::vector<uint8_t> &sequence);
 
   InternalGPIOPin *clk_pin_{nullptr};
-  InternalGPIOPin *dta_pin_{nullptr};
+  InternalGPIOPin *read_pin_{nullptr};
+  GPIOPin *write_pin_{nullptr};
 
   std::array<binary_sensor::BinarySensor *, 32> zone_sensors_{};
   ParadoxAlarmControlPanel *alarm_control_panel_{nullptr};

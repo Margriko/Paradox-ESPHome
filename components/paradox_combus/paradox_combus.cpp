@@ -70,7 +70,7 @@ void ParadoxCombusComponent::register_zone_sensor(uint8_t zone, binary_sensor::B
 }
 
 void ParadoxCombusComponent::capture_combus_bits_() {
-  if (this->clk_pin_ == nullptr || this->dta_pin_ == nullptr) {
+  if (this->clk_pin_ == nullptr || this->read_pin_ == nullptr) {
     return;
   }
 
@@ -90,7 +90,7 @@ void ParadoxCombusComponent::capture_combus_bits_() {
 
   this->sample_pending_ = false;
 
-  this->bus_message_.push_back(this->dta_pin_->digital_read() ? '0' : '1');
+  this->bus_message_.push_back(this->read_pin_->digital_read() ? '0' : '1');
 
   if (this->bus_message_.length() > 200) {
     this->bus_message_.clear();
@@ -158,13 +158,13 @@ void ParadoxCombusComponent::request_arm_night(const optional<std::string> &code
 }
 
 void ParadoxCombusComponent::process_pending_bus_writes_() {
-  if (this->clk_pin_ == nullptr || this->dta_pin_ == nullptr) {
+  if (this->clk_pin_ == nullptr || this->write_pin_ == nullptr) {
     return;
   }
 
   if (this->tx_bits_.empty()) {
     if (this->tx_drive_low_) {
-      this->dta_pin_->pin_mode(gpio::FLAG_INPUT);
+      this->write_pin_->pin_mode(gpio::FLAG_INPUT);
       this->tx_drive_low_ = false;
     }
     return;
@@ -177,24 +177,28 @@ void ParadoxCombusComponent::process_pending_bus_writes_() {
 
     // COMBUS uses open collector signalling: logical '1' is driven low, logical '0' is release.
     if (write_bit) {
-      this->dta_pin_->pin_mode(gpio::FLAG_OUTPUT);
-      this->dta_pin_->digital_write(false);
+      this->write_pin_->pin_mode(gpio::FLAG_OUTPUT);
+      this->write_pin_->digital_write(false);
       this->tx_drive_low_ = true;
     } else {
-      this->dta_pin_->pin_mode(gpio::FLAG_INPUT);
+      this->write_pin_->pin_mode(gpio::FLAG_INPUT);
       this->tx_drive_low_ = false;
     }
   }
 }
 
 void ParadoxCombusComponent::connect_combus_() {
-  if (this->clk_pin_ == nullptr || this->dta_pin_ == nullptr) {
-    ESP_LOGE(TAG, "clk_pin and dta_pin are required");
+  if (this->clk_pin_ == nullptr || this->read_pin_ == nullptr) {
+    ESP_LOGE(TAG, "clk_pin and read_pin are required");
     return;
   }
 
   this->clk_pin_->pin_mode(gpio::FLAG_INPUT);
-  this->dta_pin_->pin_mode(gpio::FLAG_INPUT);
+  this->read_pin_->pin_mode(gpio::FLAG_INPUT);
+  if (this->write_pin_ == nullptr) {
+    this->write_pin_ = this->read_pin_;
+  }
+  this->write_pin_->pin_mode(gpio::FLAG_INPUT);
 
   this->last_clk_state_ = this->clk_pin_->digital_read();
   this->sample_pending_ = false;
@@ -208,7 +212,9 @@ void ParadoxCombusComponent::connect_combus_() {
 void ParadoxCombusComponent::disconnect_combus_() {
   this->sample_pending_ = false;
   this->tx_bits_.clear();
-  this->dta_pin_->pin_mode(gpio::FLAG_INPUT);
+  if (this->write_pin_ != nullptr) {
+    this->write_pin_->pin_mode(gpio::FLAG_INPUT);
+  }
   this->tx_drive_low_ = false;
   this->bus_message_.clear();
   this->combus_connection_status_ = false;
@@ -249,13 +255,13 @@ void ParadoxCombusComponent::loop() {
     return;
   }
 
-  String message = this->bus_message_.c_str();
+  std::string message = this->bus_message_;
   this->bus_message_.clear();
 
   this->decode_message_(message);
 }
 
-void ParadoxCombusComponent::process_zone_status_(String &msg) {
+void ParadoxCombusComponent::process_zone_status_(const std::string &msg) {
   if (msg.length() < 17 + (32 * 2)) {
     ESP_LOGW(TAG, "Zone frame too short: %u bits", msg.length());
     return;
@@ -267,7 +273,7 @@ void ParadoxCombusComponent::process_zone_status_(String &msg) {
   }
 }
 
-void ParadoxCombusComponent::process_alarm_status_(String &msg) {
+void ParadoxCombusComponent::process_alarm_status_(const std::string &msg) {
   if (msg.length() <= ((8 * 7) + 1)) {
     ESP_LOGW(TAG, "Alarm frame too short: %u bits", msg.length());
     return;
@@ -294,15 +300,15 @@ void ParadoxCombusComponent::process_alarm_status_(String &msg) {
   }
 }
 
-void ParadoxCombusComponent::decode_message_(String &msg) {
+void ParadoxCombusComponent::decode_message_(std::string &msg) {
   if (msg.length() < 8) {
     return;
   }
 
-  int cmd = get_int_from_string_(msg.substring(0, 8));
+  int cmd = get_int_from_string_(msg.substr(0, 8));
 
   if (cmd == 0xD0 || cmd == 0xD1) {
-    msg = msg.substring(0, msg.length() - (4 * 8) - 1);
+    msg = msg.substr(0, msg.length() - (4 * 8) - 1);
     if (!check_crc_(msg)) {
       return;
     }
@@ -324,7 +330,7 @@ void ParadoxCombusComponent::decode_message_(String &msg) {
   }
 }
 
-uint8_t ParadoxCombusComponent::crc8_(uint8_t *addr, uint8_t len) {
+uint8_t ParadoxCombusComponent::crc8_(const uint8_t *addr, uint8_t len) {
   uint8_t crc = 0;
 
   for (uint8_t i = 0; i < len; i++) {
@@ -341,21 +347,16 @@ uint8_t ParadoxCombusComponent::crc8_(uint8_t *addr, uint8_t len) {
   return crc;
 }
 
-uint8_t ParadoxCombusComponent::check_crc_(String &st) {
+uint8_t ParadoxCombusComponent::check_crc_(const std::string &st) {
   int bytes = (st.length()) / 8;
   if (bytes < 2) {
     return false;
   }
-  uint8_t calc_crc_byte;
+  const std::vector<uint8_t> binary_str = str_to_bin_array_(st);
 
-  uint8_t *binary_str = str_to_bin_array_(st);
-
-  uint8_t crc = binary_str[bytes - 1];
-  calc_crc_byte = crc8_(binary_str, (int) bytes - 1);
-  bool valid = calc_crc_byte == crc;
-
-  delete[] binary_str;
-  return valid;
+  const uint8_t crc = binary_str[bytes - 1];
+  const uint8_t calc_crc_byte = crc8_(binary_str.data(), bytes - 1);
+  return calc_crc_byte == crc;
 }
 
 bool ParadoxCombusComponent::check_clock_idle_() {
@@ -369,7 +370,7 @@ bool ParadoxCombusComponent::check_clock_idle_() {
   }
 }
 
-unsigned int ParadoxCombusComponent::get_int_from_string_(String str) {
+unsigned int ParadoxCombusComponent::get_int_from_string_(const std::string &str) {
   int r = 0;
   int length = str.length();
 
@@ -382,14 +383,12 @@ unsigned int ParadoxCombusComponent::get_int_from_string_(String str) {
   return r;
 }
 
-uint8_t *ParadoxCombusComponent::str_to_bin_array_(String &st) {
-  int bytes = (st.length()) / 8;
-  auto *data = new uint8_t[bytes];
-
-  String val = "";
+std::vector<uint8_t> ParadoxCombusComponent::str_to_bin_array_(const std::string &st) {
+  const int bytes = st.length() / 8;
+  std::vector<uint8_t> data(bytes);
 
   for (int i = 0; i < bytes; i++) {
-    val = st.substring((i * 8), ((i * 8)) + 8);
+    const std::string val = st.substr(i * 8, 8);
     data[i] = get_int_from_string_(val);
   }
 
