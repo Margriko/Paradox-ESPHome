@@ -80,6 +80,7 @@ class ParadoxCombusComponent : public Component {
   void capture_combus_bits_();
   void process_pending_bus_writes_();
   void queue_write_sequence_(const std::vector<uint8_t> &sequence);
+  void log_bus_diagnostics_();
 
   InternalGPIOPin *clk_pin_{nullptr};
   InternalGPIOPin *read_pin_{nullptr};
@@ -100,6 +101,12 @@ class ParadoxCombusComponent : public Component {
   bool sample_pending_{false};
   unsigned long pending_sample_at_{0};
   unsigned long last_clk_signal_{0};
+  unsigned long last_diag_log_at_{0};
+  uint32_t clock_falling_edges_{0};
+  uint32_t sampled_bits_{0};
+  uint32_t decoded_frames_{0};
+  uint32_t crc_drop_frames_{0};
+  uint32_t overflow_drop_frames_{0};
   bool combus_connection_status_{false};
 
 };
