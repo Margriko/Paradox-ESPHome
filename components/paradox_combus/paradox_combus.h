@@ -35,6 +35,7 @@ class ParadoxCombusComponent : public Component {
   void set_clk_pin(InternalGPIOPin *pin) { this->clk_pin_ = pin; }
   void set_read_pin(InternalGPIOPin *pin) { this->read_pin_ = pin; }
   void set_write_pin(GPIOPin *pin) { this->write_pin_ = pin; }
+  void set_frame_idle_us(uint32_t frame_idle_us) { this->frame_idle_us_ = frame_idle_us; }
 
   void register_zone_sensor(uint8_t zone, binary_sensor::BinarySensor *sensor);
   void set_alarm_control_panel(ParadoxAlarmControlPanel *panel) { this->alarm_control_panel_ = panel; }
@@ -81,6 +82,7 @@ class ParadoxCombusComponent : public Component {
   void process_pending_bus_writes_();
   void queue_write_sequence_(const std::vector<uint8_t> &sequence);
   void log_bus_diagnostics_();
+  void track_frame_length_(size_t frame_bits);
 
   InternalGPIOPin *clk_pin_{nullptr};
   InternalGPIOPin *read_pin_{nullptr};
@@ -107,6 +109,12 @@ class ParadoxCombusComponent : public Component {
   uint32_t decoded_frames_{0};
   uint32_t crc_drop_frames_{0};
   uint32_t overflow_drop_frames_{0};
+  std::array<uint32_t, 8> frame_len_hist_{};
+  uint32_t short_frame_drops_{0};
+  uint32_t malformed_d1_d0_frames_{0};
+  std::string last_crc_fail_preview_;
+  uint8_t last_crc_fail_cmd_{0};
+  uint32_t frame_idle_us_{25000};
   bool combus_connection_status_{false};
 
 };

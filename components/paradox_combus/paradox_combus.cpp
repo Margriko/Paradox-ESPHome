@@ -242,10 +242,15 @@ void ParadoxCombusComponent::connect_combus_() {
   this->decoded_frames_ = 0;
   this->crc_drop_frames_ = 0;
   this->overflow_drop_frames_ = 0;
+  this->frame_len_hist_.fill(0);
+  this->short_frame_drops_ = 0;
+  this->malformed_d1_d0_frames_ = 0;
+  this->last_crc_fail_preview_.clear();
+  this->last_crc_fail_cmd_ = 0;
   this->bus_message_.clear();
 
   this->combus_connection_status_ = true;
-  ESP_LOGI(TAG, "COMBUS initialized in polling mode");
+  ESP_LOGI(TAG, "COMBUS initialized in polling mode (frame_idle_us=%u)", static_cast<unsigned>(this->frame_idle_us_));
 }
 
 void ParadoxCombusComponent::disconnect_combus_() {
@@ -318,6 +323,19 @@ void ParadoxCombusComponent::log_bus_diagnostics_() {
              static_cast<unsigned>(this->clock_falling_edges_), static_cast<unsigned>(this->sampled_bits_),
              static_cast<unsigned>(this->decoded_frames_), static_cast<unsigned>(this->crc_drop_frames_),
              static_cast<unsigned>(this->overflow_drop_frames_), static_cast<unsigned>(this->tx_bits_.size()));
+
+    ESP_LOGD(TAG,
+             "COMBUS frame lens (5s): <=8=%u 9-16=%u 17-32=%u 33-64=%u 65-96=%u 97-128=%u 129-160=%u >160=%u "
+             "short_drop=%u malformed_d0d1=%u",
+             static_cast<unsigned>(this->frame_len_hist_[0]), static_cast<unsigned>(this->frame_len_hist_[1]),
+             static_cast<unsigned>(this->frame_len_hist_[2]), static_cast<unsigned>(this->frame_len_hist_[3]),
+             static_cast<unsigned>(this->frame_len_hist_[4]), static_cast<unsigned>(this->frame_len_hist_[5]),
+             static_cast<unsigned>(this->frame_len_hist_[6]), static_cast<unsigned>(this->frame_len_hist_[7]),
+             static_cast<unsigned>(this->short_frame_drops_), static_cast<unsigned>(this->malformed_d1_d0_frames_));
+
+    if (!this->last_crc_fail_preview_.empty()) {
+      ESP_LOGD(TAG, "Last CRC fail cmd=0x%02X bits=%s", this->last_crc_fail_cmd_, this->last_crc_fail_preview_.c_str());
+    }
   }
 
   this->clock_falling_edges_ = 0;
@@ -325,6 +343,29 @@ void ParadoxCombusComponent::log_bus_diagnostics_() {
   this->decoded_frames_ = 0;
   this->crc_drop_frames_ = 0;
   this->overflow_drop_frames_ = 0;
+  this->frame_len_hist_.fill(0);
+  this->short_frame_drops_ = 0;
+  this->malformed_d1_d0_frames_ = 0;
+}
+
+void ParadoxCombusComponent::track_frame_length_(size_t frame_bits) {
+  if (frame_bits <= 8) {
+    this->frame_len_hist_[0]++;
+  } else if (frame_bits <= 16) {
+    this->frame_len_hist_[1]++;
+  } else if (frame_bits <= 32) {
+    this->frame_len_hist_[2]++;
+  } else if (frame_bits <= 64) {
+    this->frame_len_hist_[3]++;
+  } else if (frame_bits <= 96) {
+    this->frame_len_hist_[4]++;
+  } else if (frame_bits <= 128) {
+    this->frame_len_hist_[5]++;
+  } else if (frame_bits <= 160) {
+    this->frame_len_hist_[6]++;
+  } else {
+    this->frame_len_hist_[7]++;
+  }
 }
 
 void ParadoxCombusComponent::process_zone_status_(const std::string &msg) {
@@ -367,7 +408,10 @@ void ParadoxCombusComponent::process_alarm_status_(const std::string &msg) {
 }
 
 void ParadoxCombusComponent::decode_message_(std::string &msg) {
+  this->track_frame_length_(msg.length());
+
   if (msg.length() < 8) {
+    this->short_frame_drops_++;
     return;
   }
 
@@ -377,15 +421,25 @@ void ParadoxCombusComponent::decode_message_(std::string &msg) {
            format_bits_preview(msg).c_str());
 
   if (cmd == 0xD0 || cmd == 0xD1) {
+    if (msg.length() <= ((4 * 8) + 1)) {
+      this->malformed_d1_d0_frames_++;
+      ESP_LOGD(TAG, "RX frame dropped: cmd 0x%02X too short for postamble trim (%u bits)", cmd,
+               static_cast<unsigned>(msg.length()));
+      return;
+    }
     msg = msg.substr(0, msg.length() - (4 * 8) - 1);
     if (!check_crc_(msg)) {
       this->crc_drop_frames_++;
+      this->last_crc_fail_cmd_ = cmd;
+      this->last_crc_fail_preview_ = format_bits_preview(msg);
       ESP_LOGD(TAG, "RX frame dropped: CRC mismatch for cmd 0x%02X", cmd);
       return;
     }
   } else {
     if (!check_crc_(msg)) {
       this->crc_drop_frames_++;
+      this->last_crc_fail_cmd_ = cmd;
+      this->last_crc_fail_preview_ = format_bits_preview(msg);
       ESP_LOGD(TAG, "RX frame dropped: CRC mismatch for cmd 0x%02X", cmd);
       return;
     }
@@ -440,7 +494,7 @@ bool ParadoxCombusComponent::check_clock_idle_() {
   unsigned long current_micros = micros();
   long idletime = (current_micros - this->last_clk_signal_);
 
-  if (idletime > 8000) {
+  if (idletime > static_cast<long>(this->frame_idle_us_)) {
     return true;
   } else {
     return false;

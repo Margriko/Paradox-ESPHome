@@ -48,6 +48,9 @@ external_components:
 paradox_combus:
   id: combus
   clk_pin: D1
+  # Optional: frame split idle timeout (microseconds).
+  # Increase if logs show mostly very short frames (<=8 bits).
+  frame_idle_us: 25000
   # Legacy/shared data line (single pin for read+write):
   # dta_pin: D2
   # 3-channel optocoupler wiring (recommended for PC817 modules):
