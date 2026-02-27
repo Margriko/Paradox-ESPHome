@@ -375,6 +375,36 @@ void ParadoxCombusComponent::track_frame_length_(size_t frame_bits) {
   }
 }
 
+bool ParadoxCombusComponent::recover_byte_alignment_(std::string &msg, int cmd, bool trim_postamble) {
+  const size_t original_length = msg.length();
+  for (size_t trim_bits = 1; trim_bits <= 7; trim_bits++) {
+    if (original_length <= trim_bits) {
+      break;
+    }
+
+    std::string candidate = msg.substr(0, original_length - trim_bits);
+    if (trim_postamble) {
+      if (candidate.length() <= ((4 * 8) + 1)) {
+        continue;
+      }
+      candidate = candidate.substr(0, candidate.length() - (4 * 8) - 1);
+    }
+
+    if ((candidate.length() % 8) != 0 || !this->check_crc_(candidate)) {
+      continue;
+    }
+
+    ESP_LOGD(TAG,
+             "RX frame recovered: trimmed %u trailing bit(s) to restore byte alignment (cmd=0x%02X, %u -> %u bits)",
+             static_cast<unsigned>(trim_bits), cmd, static_cast<unsigned>(original_length),
+             static_cast<unsigned>(msg.length() - trim_bits));
+    msg.resize(original_length - trim_bits);
+    return true;
+  }
+
+  return false;
+}
+
 void ParadoxCombusComponent::process_zone_status_(const std::string &msg) {
   if (msg.length() < 17 + (32 * 2)) {
     ESP_LOGW(TAG, "Zone frame too short: %u bits", msg.length());
@@ -428,6 +458,13 @@ void ParadoxCombusComponent::decode_message_(std::string &msg) {
            format_bits_preview(msg).c_str());
 
   if (cmd == 0xD0 || cmd == 0xD1) {
+    if ((msg.length() % 8) != 0 && !this->recover_byte_alignment_(msg, cmd, true)) {
+      this->misaligned_frame_drops_++;
+      ESP_LOGD(TAG, "RX frame dropped: bit length not byte-aligned (cmd=0x%02X, %u bits)", cmd,
+               static_cast<unsigned>(msg.length()));
+      return;
+    }
+
     if (msg.length() <= ((4 * 8) + 1)) {
       this->malformed_d1_d0_frames_++;
       ESP_LOGD(TAG, "RX frame dropped: cmd 0x%02X too short for postamble trim (%u bits)", cmd,
@@ -449,7 +486,7 @@ void ParadoxCombusComponent::decode_message_(std::string &msg) {
       return;
     }
   } else {
-    if ((msg.length() % 8) != 0) {
+    if ((msg.length() % 8) != 0 && !this->recover_byte_alignment_(msg, cmd, false)) {
       this->misaligned_frame_drops_++;
       ESP_LOGD(TAG, "RX frame dropped: bit length not byte-aligned (%u bits, cmd=0x%02X)",
                static_cast<unsigned>(msg.length()), cmd);
