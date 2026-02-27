@@ -51,6 +51,10 @@ paradox_combus:
   # Optional: frame split idle timeout (microseconds).
   # Increase if logs show mostly very short frames (<=8 bits).
   frame_idle_us: 25000
+  # Optional: sampling delay after each falling clock edge (40..250 us).
+  sample_delay_us: 150
+  # Optional: invert read polarity for troubleshooting optocoupler/wiring polarity.
+  invert_data: false
   # Legacy/shared data line (single pin for read+write):
   # dta_pin: D2
   # 3-channel optocoupler wiring (recommended for PC817 modules):
