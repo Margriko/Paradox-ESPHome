@@ -318,6 +318,7 @@ void ParadoxCombusComponent::log_bus_diagnostics_() {
   }
 
   this->last_diag_log_at_ = now;
+  const float edges_per_second = this->clock_falling_edges_ / 5.0f;
   if (this->clock_falling_edges_ == 0) {
     ESP_LOGW(TAG,
              "No COMBUS clock edges seen in last 5s (clk=%d read=%d). Check wiring/level-shifting/opto speed.",
@@ -341,6 +342,14 @@ void ParadoxCombusComponent::log_bus_diagnostics_() {
 
     if (!this->last_crc_fail_preview_.empty()) {
       ESP_LOGD(TAG, "Last CRC fail cmd=0x%02X bits=%s", this->last_crc_fail_cmd_, this->last_crc_fail_preview_.c_str());
+    }
+
+    if (edges_per_second < 100.0f) {
+      ESP_LOGW(TAG,
+               "Very low COMBUS clock activity detected (%.1f falling edges/sec). "
+               "This usually indicates wiring/level-shifting/sampling issues. "
+               "Try invert_data, reduce sample_delay_us, and verify optocoupler speed.",
+               edges_per_second);
     }
   }
 
@@ -447,7 +456,9 @@ void ParadoxCombusComponent::process_alarm_status_(const std::string &msg) {
 void ParadoxCombusComponent::decode_message_(std::string &msg) {
   this->track_frame_length_(msg.length());
 
-  if (msg.length() < 8) {
+  // A valid COMBUS packet must contain at least one payload byte plus one CRC byte.
+  // Shorter captures are almost always split/noise artifacts and should be dropped early.
+  if (msg.length() < 16) {
     this->short_frame_drops_++;
     return;
   }

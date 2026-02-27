@@ -80,5 +80,6 @@ alarm_control_panel:
 - The COMBUS parser/decoder remains based on the original implementation and now publishes directly to registered ESPHome entities.
 - If logs show repeated `bit length not byte-aligned` or `CRC mismatch` drops, start from `frame_idle_us: 25000` and `sample_delay_us: 150`.
   Values like `frame_idle_us: 150000` can merge multiple packets into one frame and will usually prevent decoding.
+- If diagnostics show very low clock activity (for example tens of edges/sec), decoding will fail regardless of CRC/frame tuning; this usually points to wiring, pull-up, level-shifting, or optocoupler speed limits.
 - Pin configuration moved from hardcoded C++ defines to YAML (`clk_pin`, plus either legacy `dta_pin` or split `read_pin`/`write_pin`).
 - Existing sample configuration was migrated to this new format in `alarm.yaml`.
