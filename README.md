@@ -57,6 +57,9 @@ paradox_combus:
   # Sample on rising edge for slave->master packets (default).
   # Set false to sample after falling edge if your wiring inverts bus phases.
   sample_on_rising: true
+  # Reject clock transitions that arrive too quickly (noise/glitches).
+  # For 1 kHz COMBUS, start around 450-500 us.
+  min_edge_interval_us: 450
   # Optional: invert read polarity for troubleshooting optocoupler/wiring polarity.
   invert_data: false
   # Legacy/shared data line (single pin for read+write):

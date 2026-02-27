@@ -39,6 +39,9 @@ paradox_combus:
   # Sample on rising edge for slave->master packets (default).
   # Set false to sample after falling edge if your wiring inverts bus phases.
   sample_on_rising: true
+  # Reject clock transitions that arrive too quickly (noise/glitches).
+  # For 1 kHz COMBUS, start around 450-500 us.
+  min_edge_interval_us: 450
   # Optional data polarity inversion for read sampling.
   invert_data: false
   # Legacy single data pin (shared read/write):
@@ -82,7 +85,7 @@ alarm_control_panel:
 ## Notes
 
 - The COMBUS parser/decoder remains based on the original implementation and now publishes directly to registered ESPHome entities.
-- If logs show repeated `bit length not byte-aligned` or `CRC mismatch` drops, start from `frame_idle_us: 25000`, `sample_on_rising: true`, and `sample_delay_us: 350` (then tune in ~50 us steps).
+- If logs show repeated `bit length not byte-aligned` or `CRC mismatch` drops, start from `frame_idle_us: 25000`, `sample_on_rising: true`, `min_edge_interval_us: 450`, and `sample_delay_us: 350` (then tune in ~50 us steps).
   Values like `frame_idle_us: 150000` can merge multiple packets into one frame and will usually prevent decoding.
 - If diagnostics show very low clock activity (for example tens of edges/sec), decoding will fail regardless of CRC/frame tuning; this usually points to wiring, pull-up, level-shifting, or optocoupler speed limits.
 - Pin configuration moved from hardcoded C++ defines to YAML (`clk_pin`, plus either legacy `dta_pin` or split `read_pin`/`write_pin`).
