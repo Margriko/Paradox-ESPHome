@@ -51,8 +51,15 @@ paradox_combus:
   # Optional: frame split idle timeout (microseconds).
   # Increase if logs show mostly very short frames (<=8 bits).
   frame_idle_us: 25000
-  # Optional: sampling delay after each falling clock edge (40..250 us).
-  sample_delay_us: 150
+  # Optional: sampling delay after selected clock edge (40..900 us).
+  # Paradox COMBUS at 1 kHz often needs ~300-500 us for stable reads.
+  sample_delay_us: 350
+  # Sample on rising edge for slave->master packets (default).
+  # Set false to sample after falling edge if your wiring inverts bus phases.
+  sample_on_rising: true
+  # Reject clock transitions that arrive too quickly (noise/glitches).
+  # For 1 kHz COMBUS, start around 450-500 us.
+  min_edge_interval_us: 450
   # Optional: invert read polarity for troubleshooting optocoupler/wiring polarity.
   invert_data: false
   # Legacy/shared data line (single pin for read+write):

@@ -17,6 +17,8 @@ CONF_WRITE_PIN = "write_pin"
 CONF_FRAME_IDLE_US = "frame_idle_us"
 CONF_SAMPLE_DELAY_US = "sample_delay_us"
 CONF_INVERT_DATA = "invert_data"
+CONF_SAMPLE_ON_RISING = "sample_on_rising"
+CONF_MIN_EDGE_INTERVAL_US = "min_edge_interval_us"
 
 BASE_SCHEMA = cv.Schema(
     {
@@ -26,7 +28,9 @@ BASE_SCHEMA = cv.Schema(
         cv.Optional(CONF_READ_PIN): pins.internal_gpio_input_pin_schema,
         cv.Optional(CONF_WRITE_PIN): pins.internal_gpio_output_pin_schema,
         cv.Optional(CONF_FRAME_IDLE_US, default=25000): cv.int_range(min=2000, max=200000),
-        cv.Optional(CONF_SAMPLE_DELAY_US, default=150): cv.int_range(min=40, max=250),
+        cv.Optional(CONF_SAMPLE_DELAY_US, default=350): cv.int_range(min=40, max=900),
+        cv.Optional(CONF_SAMPLE_ON_RISING, default=True): cv.boolean,
+        cv.Optional(CONF_MIN_EDGE_INTERVAL_US, default=450): cv.int_range(min=0, max=5000),
         cv.Optional(CONF_INVERT_DATA, default=False): cv.boolean,
     }
 ).extend(cv.COMPONENT_SCHEMA)
@@ -57,6 +61,8 @@ async def to_code(config):
     cg.add(var.set_clk_pin(clk))
     cg.add(var.set_frame_idle_us(config[CONF_FRAME_IDLE_US]))
     cg.add(var.set_sample_delay_us(config[CONF_SAMPLE_DELAY_US]))
+    cg.add(var.set_sample_on_rising(config[CONF_SAMPLE_ON_RISING]))
+    cg.add(var.set_min_edge_interval_us(config[CONF_MIN_EDGE_INTERVAL_US]))
     cg.add(var.set_invert_data(config[CONF_INVERT_DATA]))
 
     if CONF_DTA_PIN in config:

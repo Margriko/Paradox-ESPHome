@@ -105,13 +105,30 @@ void ParadoxCombusComponent::capture_combus_bits_() {
 
   const unsigned long now = micros();
   const bool clk_state = this->clk_pin_->digital_read();
+  const bool clk_rising = !this->last_clk_state_ && clk_state;
+  const bool clk_falling = this->last_clk_state_ && !clk_state;
+  const bool has_clk_edge = clk_rising || clk_falling;
 
-  if (this->last_clk_state_ && !clk_state) {
+  if (has_clk_edge) {
+    const uint32_t edge_interval = static_cast<uint32_t>(now - this->last_accepted_clk_edge_at_);
+    if (this->last_accepted_clk_edge_at_ != 0 && edge_interval < this->min_edge_interval_us_) {
+      this->rejected_clock_edges_++;
+      this->last_clk_state_ = clk_state;
+      return;
+    }
+    this->last_accepted_clk_edge_at_ = now;
+  }
+
+  if (clk_falling) {
     this->last_clk_signal_ = now;
-    this->pending_sample_at_ = now + this->sample_delay_us_;
-    this->sample_pending_ = true;
     this->clock_falling_edges_++;
   }
+
+  if ((this->sample_on_rising_ && clk_rising) || (!this->sample_on_rising_ && clk_falling)) {
+    this->pending_sample_at_ = now + this->sample_delay_us_;
+    this->sample_pending_ = true;
+  }
+
   this->last_clk_state_ = clk_state;
 
   if (!this->sample_pending_ || static_cast<long>(now - this->pending_sample_at_) < 0) {
@@ -239,7 +256,9 @@ void ParadoxCombusComponent::connect_combus_() {
   this->sample_pending_ = false;
   this->last_clk_signal_ = micros();
   this->last_diag_log_at_ = this->last_clk_signal_;
+  this->last_accepted_clk_edge_at_ = 0;
   this->clock_falling_edges_ = 0;
+  this->rejected_clock_edges_ = 0;
   this->sampled_bits_ = 0;
   this->decoded_frames_ = 0;
   this->crc_drop_frames_ = 0;
@@ -253,9 +272,11 @@ void ParadoxCombusComponent::connect_combus_() {
   this->bus_message_.clear();
 
   this->combus_connection_status_ = true;
-  ESP_LOGI(TAG, "COMBUS initialized in polling mode (frame_idle_us=%u, sample_delay_us=%u, invert_data=%s)",
+  ESP_LOGI(TAG,
+           "COMBUS initialized in polling mode (frame_idle_us=%u, sample_delay_us=%u, sample_on_rising=%s, "
+           "min_edge_interval_us=%u, invert_data=%s)",
            static_cast<unsigned>(this->frame_idle_us_), static_cast<unsigned>(this->sample_delay_us_),
-           YESNO(this->invert_data_));
+           YESNO(this->sample_on_rising_), static_cast<unsigned>(this->min_edge_interval_us_), YESNO(this->invert_data_));
 }
 
 void ParadoxCombusComponent::disconnect_combus_() {
@@ -325,10 +346,12 @@ void ParadoxCombusComponent::log_bus_diagnostics_() {
              this->clk_pin_->digital_read(), this->read_pin_->digital_read());
   } else {
     ESP_LOGD(TAG,
-             "COMBUS diag (5s): clk_edges=%u sampled_bits=%u decoded=%u crc_drop=%u overflow_drop=%u tx_pending_bits=%u",
-             static_cast<unsigned>(this->clock_falling_edges_), static_cast<unsigned>(this->sampled_bits_),
-             static_cast<unsigned>(this->decoded_frames_), static_cast<unsigned>(this->crc_drop_frames_),
-             static_cast<unsigned>(this->overflow_drop_frames_), static_cast<unsigned>(this->tx_bits_.size()));
+             "COMBUS diag (5s): clk_edges=%u rejected_edges=%u sampled_bits=%u decoded=%u crc_drop=%u "
+             "overflow_drop=%u tx_pending_bits=%u",
+             static_cast<unsigned>(this->clock_falling_edges_), static_cast<unsigned>(this->rejected_clock_edges_),
+             static_cast<unsigned>(this->sampled_bits_), static_cast<unsigned>(this->decoded_frames_),
+             static_cast<unsigned>(this->crc_drop_frames_), static_cast<unsigned>(this->overflow_drop_frames_),
+             static_cast<unsigned>(this->tx_bits_.size()));
 
     ESP_LOGD(TAG,
              "COMBUS frame lens (5s): <=8=%u 9-16=%u 17-32=%u 33-64=%u 65-96=%u 97-128=%u 129-160=%u >160=%u "
@@ -348,12 +371,13 @@ void ParadoxCombusComponent::log_bus_diagnostics_() {
       ESP_LOGW(TAG,
                "Very low COMBUS clock activity detected (%.1f falling edges/sec). "
                "This usually indicates wiring/level-shifting/sampling issues. "
-               "Try invert_data, reduce sample_delay_us, and verify optocoupler speed.",
+               "Try invert_data, tune min_edge_interval_us/sample_delay_us, and verify optocoupler speed.",
                edges_per_second);
     }
   }
 
   this->clock_falling_edges_ = 0;
+  this->rejected_clock_edges_ = 0;
   this->sampled_bits_ = 0;
   this->decoded_frames_ = 0;
   this->crc_drop_frames_ = 0;
