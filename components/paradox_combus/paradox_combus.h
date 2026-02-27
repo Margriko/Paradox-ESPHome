@@ -85,6 +85,7 @@ class ParadoxCombusComponent : public Component {
   void queue_write_sequence_(const std::vector<uint8_t> &sequence);
   void log_bus_diagnostics_();
   void track_frame_length_(size_t frame_bits);
+  bool recover_byte_alignment_(std::string &msg, int cmd, bool trim_postamble);
 
   InternalGPIOPin *clk_pin_{nullptr};
   InternalGPIOPin *read_pin_{nullptr};
