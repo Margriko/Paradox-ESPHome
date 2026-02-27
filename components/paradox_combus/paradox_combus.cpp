@@ -105,13 +105,19 @@ void ParadoxCombusComponent::capture_combus_bits_() {
 
   const unsigned long now = micros();
   const bool clk_state = this->clk_pin_->digital_read();
+  const bool clk_rising = !this->last_clk_state_ && clk_state;
+  const bool clk_falling = this->last_clk_state_ && !clk_state;
 
-  if (this->last_clk_state_ && !clk_state) {
+  if (clk_falling) {
     this->last_clk_signal_ = now;
-    this->pending_sample_at_ = now + this->sample_delay_us_;
-    this->sample_pending_ = true;
     this->clock_falling_edges_++;
   }
+
+  if ((this->sample_on_rising_ && clk_rising) || (!this->sample_on_rising_ && clk_falling)) {
+    this->pending_sample_at_ = now + this->sample_delay_us_;
+    this->sample_pending_ = true;
+  }
+
   this->last_clk_state_ = clk_state;
 
   if (!this->sample_pending_ || static_cast<long>(now - this->pending_sample_at_) < 0) {
@@ -253,9 +259,11 @@ void ParadoxCombusComponent::connect_combus_() {
   this->bus_message_.clear();
 
   this->combus_connection_status_ = true;
-  ESP_LOGI(TAG, "COMBUS initialized in polling mode (frame_idle_us=%u, sample_delay_us=%u, invert_data=%s)",
+  ESP_LOGI(TAG,
+           "COMBUS initialized in polling mode (frame_idle_us=%u, sample_delay_us=%u, sample_on_rising=%s, "
+           "invert_data=%s)",
            static_cast<unsigned>(this->frame_idle_us_), static_cast<unsigned>(this->sample_delay_us_),
-           YESNO(this->invert_data_));
+           YESNO(this->sample_on_rising_), YESNO(this->invert_data_));
 }
 
 void ParadoxCombusComponent::disconnect_combus_() {

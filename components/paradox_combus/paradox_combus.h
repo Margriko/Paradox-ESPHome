@@ -38,6 +38,7 @@ class ParadoxCombusComponent : public Component {
   void set_frame_idle_us(uint32_t frame_idle_us) { this->frame_idle_us_ = frame_idle_us; }
   void set_sample_delay_us(uint32_t sample_delay_us) { this->sample_delay_us_ = sample_delay_us; }
   void set_invert_data(bool invert_data) { this->invert_data_ = invert_data; }
+  void set_sample_on_rising(bool sample_on_rising) { this->sample_on_rising_ = sample_on_rising; }
 
   void register_zone_sensor(uint8_t zone, binary_sensor::BinarySensor *sensor);
   void set_alarm_control_panel(ParadoxAlarmControlPanel *panel) { this->alarm_control_panel_ = panel; }
@@ -118,9 +119,10 @@ class ParadoxCombusComponent : public Component {
   std::string last_crc_fail_preview_;
   uint8_t last_crc_fail_cmd_{0};
   uint32_t frame_idle_us_{25000};
-  uint32_t sample_delay_us_{150};
+  uint32_t sample_delay_us_{350};
   uint32_t misaligned_frame_drops_{0};
   bool invert_data_{false};
+  bool sample_on_rising_{true};
   bool combus_connection_status_{false};
 
 };
