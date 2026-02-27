@@ -40,6 +40,8 @@ paradox_combus:
   # 3-channel optocoupler wiring:
   read_pin: D2
   write_pin: D3
+  sample_delay_us: 150
+  invert_data: false
 
 binary_sensor:
   - platform: paradox_combus

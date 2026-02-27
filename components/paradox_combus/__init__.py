@@ -15,6 +15,8 @@ CONF_DTA_PIN = "dta_pin"
 CONF_READ_PIN = "read_pin"
 CONF_WRITE_PIN = "write_pin"
 CONF_FRAME_IDLE_US = "frame_idle_us"
+CONF_SAMPLE_DELAY_US = "sample_delay_us"
+CONF_INVERT_DATA = "invert_data"
 
 BASE_SCHEMA = cv.Schema(
     {
@@ -24,6 +26,8 @@ BASE_SCHEMA = cv.Schema(
         cv.Optional(CONF_READ_PIN): pins.internal_gpio_input_pin_schema,
         cv.Optional(CONF_WRITE_PIN): pins.internal_gpio_output_pin_schema,
         cv.Optional(CONF_FRAME_IDLE_US, default=25000): cv.int_range(min=2000, max=200000),
+        cv.Optional(CONF_SAMPLE_DELAY_US, default=150): cv.int_range(min=40, max=250),
+        cv.Optional(CONF_INVERT_DATA, default=False): cv.boolean,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -52,6 +56,8 @@ async def to_code(config):
     clk = await cg.gpio_pin_expression(config[CONF_CLK_PIN])
     cg.add(var.set_clk_pin(clk))
     cg.add(var.set_frame_idle_us(config[CONF_FRAME_IDLE_US]))
+    cg.add(var.set_sample_delay_us(config[CONF_SAMPLE_DELAY_US]))
+    cg.add(var.set_invert_data(config[CONF_INVERT_DATA]))
 
     if CONF_DTA_PIN in config:
         dta = await cg.gpio_pin_expression(config[CONF_DTA_PIN])

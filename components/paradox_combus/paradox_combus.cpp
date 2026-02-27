@@ -108,7 +108,7 @@ void ParadoxCombusComponent::capture_combus_bits_() {
 
   if (this->last_clk_state_ && !clk_state) {
     this->last_clk_signal_ = now;
-    this->pending_sample_at_ = now + 150;
+    this->pending_sample_at_ = now + this->sample_delay_us_;
     this->sample_pending_ = true;
     this->clock_falling_edges_++;
   }
@@ -121,7 +121,9 @@ void ParadoxCombusComponent::capture_combus_bits_() {
   this->sample_pending_ = false;
   this->sampled_bits_++;
 
-  this->bus_message_.push_back(this->read_pin_->digital_read() ? '0' : '1');
+  const bool raw_level = this->read_pin_->digital_read();
+  const bool bit_is_one = this->invert_data_ ? raw_level : !raw_level;
+  this->bus_message_.push_back(bit_is_one ? '1' : '0');
 
   if (this->bus_message_.length() > 200) {
     this->bus_message_.clear();
@@ -245,12 +247,15 @@ void ParadoxCombusComponent::connect_combus_() {
   this->frame_len_hist_.fill(0);
   this->short_frame_drops_ = 0;
   this->malformed_d1_d0_frames_ = 0;
+  this->misaligned_frame_drops_ = 0;
   this->last_crc_fail_preview_.clear();
   this->last_crc_fail_cmd_ = 0;
   this->bus_message_.clear();
 
   this->combus_connection_status_ = true;
-  ESP_LOGI(TAG, "COMBUS initialized in polling mode (frame_idle_us=%u)", static_cast<unsigned>(this->frame_idle_us_));
+  ESP_LOGI(TAG, "COMBUS initialized in polling mode (frame_idle_us=%u, sample_delay_us=%u, invert_data=%s)",
+           static_cast<unsigned>(this->frame_idle_us_), static_cast<unsigned>(this->sample_delay_us_),
+           YESNO(this->invert_data_));
 }
 
 void ParadoxCombusComponent::disconnect_combus_() {
@@ -326,12 +331,13 @@ void ParadoxCombusComponent::log_bus_diagnostics_() {
 
     ESP_LOGD(TAG,
              "COMBUS frame lens (5s): <=8=%u 9-16=%u 17-32=%u 33-64=%u 65-96=%u 97-128=%u 129-160=%u >160=%u "
-             "short_drop=%u malformed_d0d1=%u",
+             "short_drop=%u malformed_d0d1=%u misaligned=%u",
              static_cast<unsigned>(this->frame_len_hist_[0]), static_cast<unsigned>(this->frame_len_hist_[1]),
              static_cast<unsigned>(this->frame_len_hist_[2]), static_cast<unsigned>(this->frame_len_hist_[3]),
              static_cast<unsigned>(this->frame_len_hist_[4]), static_cast<unsigned>(this->frame_len_hist_[5]),
              static_cast<unsigned>(this->frame_len_hist_[6]), static_cast<unsigned>(this->frame_len_hist_[7]),
-             static_cast<unsigned>(this->short_frame_drops_), static_cast<unsigned>(this->malformed_d1_d0_frames_));
+             static_cast<unsigned>(this->short_frame_drops_), static_cast<unsigned>(this->malformed_d1_d0_frames_),
+             static_cast<unsigned>(this->misaligned_frame_drops_));
 
     if (!this->last_crc_fail_preview_.empty()) {
       ESP_LOGD(TAG, "Last CRC fail cmd=0x%02X bits=%s", this->last_crc_fail_cmd_, this->last_crc_fail_preview_.c_str());
@@ -346,6 +352,7 @@ void ParadoxCombusComponent::log_bus_diagnostics_() {
   this->frame_len_hist_.fill(0);
   this->short_frame_drops_ = 0;
   this->malformed_d1_d0_frames_ = 0;
+  this->misaligned_frame_drops_ = 0;
 }
 
 void ParadoxCombusComponent::track_frame_length_(size_t frame_bits) {
@@ -428,6 +435,12 @@ void ParadoxCombusComponent::decode_message_(std::string &msg) {
       return;
     }
     msg = msg.substr(0, msg.length() - (4 * 8) - 1);
+    if ((msg.length() % 8) != 0) {
+      this->misaligned_frame_drops_++;
+      ESP_LOGD(TAG, "RX frame dropped: bit length not byte-aligned after postamble trim (%u bits, cmd=0x%02X)",
+               static_cast<unsigned>(msg.length()), cmd);
+      return;
+    }
     if (!check_crc_(msg)) {
       this->crc_drop_frames_++;
       this->last_crc_fail_cmd_ = cmd;
@@ -436,6 +449,12 @@ void ParadoxCombusComponent::decode_message_(std::string &msg) {
       return;
     }
   } else {
+    if ((msg.length() % 8) != 0) {
+      this->misaligned_frame_drops_++;
+      ESP_LOGD(TAG, "RX frame dropped: bit length not byte-aligned (%u bits, cmd=0x%02X)",
+               static_cast<unsigned>(msg.length()), cmd);
+      return;
+    }
     if (!check_crc_(msg)) {
       this->crc_drop_frames_++;
       this->last_crc_fail_cmd_ = cmd;
