@@ -50,16 +50,17 @@ paradox_combus:
   clk_pin: D1
   # Optional: frame split idle timeout (microseconds).
   # Increase if logs show mostly very short frames (<=8 bits).
-  frame_idle_us: 25000
+  frame_idle_us: 10000
   # Optional: sampling delay after selected clock edge (40..900 us).
-  # Paradox COMBUS at 1 kHz often needs ~300-500 us for stable reads.
-  sample_delay_us: 350
-  # Sample on rising edge for slave->master packets (default).
-  # Set false to sample after falling edge if your wiring inverts bus phases.
-  sample_on_rising: true
+  # `0` enables adaptive delay based on observed clock half-cycle (recommended on ESP32 polling).
+  # Set a fixed value (e.g. 120-250) only for manual tuning.
+  sample_delay_us: 0
+  # Sample on falling edge by default (matches legacy branch behaviour).
+  # Set true if your wiring/level shifting captures cleaner data on rising edges.
+  sample_on_rising: false
   # Reject clock transitions that arrive too quickly (noise/glitches).
-  # For 1 kHz COMBUS, start around 450-500 us.
-  min_edge_interval_us: 450
+  # For 1 kHz COMBUS, start around 80-150 us.
+  min_edge_interval_us: 100
   # Optional: invert read polarity for troubleshooting optocoupler/wiring polarity.
   invert_data: false
   # Legacy/shared data line (single pin for read+write):
@@ -88,6 +89,14 @@ alarm_control_panel:
 
 `disarm_sequence` now accepts an ASCII string (for example `"1234"`) in addition to raw hex bytes.
 If `disarm_sequence` is omitted, disarm is not exposed as a writable feature.
+
+### Legacy branch timing baseline (why `master` used to work)
+
+The old interrupt-driven implementation sampled on **falling** edges with a fixed ~**150 us** timer offset.
+`v2` is polling-based on ESP32/ESP-IDF, so exact ISR timing no longer exists; it now uses adaptive delay by default (`sample_delay_us: 0`) to derive sampling point from the measured clock period.
+
+If decoding is still unstable on ESP32 + `esp-idf`, keep `invert_data: false`, start with `min_edge_interval_us: 100`, and temporarily remove `write_pin` while validating receive-only traffic.
+
 
 For a full multi-zone example, see `alarm-example.yaml`.
 

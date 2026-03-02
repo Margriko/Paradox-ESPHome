@@ -27,10 +27,10 @@ BASE_SCHEMA = cv.Schema(
         cv.Optional(CONF_DTA_PIN): pins.internal_gpio_input_pin_schema,
         cv.Optional(CONF_READ_PIN): pins.internal_gpio_input_pin_schema,
         cv.Optional(CONF_WRITE_PIN): pins.internal_gpio_output_pin_schema,
-        cv.Optional(CONF_FRAME_IDLE_US, default=25000): cv.int_range(min=2000, max=200000),
-        cv.Optional(CONF_SAMPLE_DELAY_US, default=350): cv.int_range(min=40, max=900),
-        cv.Optional(CONF_SAMPLE_ON_RISING, default=True): cv.boolean,
-        cv.Optional(CONF_MIN_EDGE_INTERVAL_US, default=450): cv.int_range(min=0, max=5000),
+        cv.Optional(CONF_FRAME_IDLE_US, default=10000): cv.int_range(min=2000, max=200000),
+        cv.Optional(CONF_SAMPLE_DELAY_US, default=0): cv.int_range(min=0, max=900),
+        cv.Optional(CONF_SAMPLE_ON_RISING, default=False): cv.boolean,
+        cv.Optional(CONF_MIN_EDGE_INTERVAL_US, default=100): cv.int_range(min=0, max=5000),
         cv.Optional(CONF_INVERT_DATA, default=False): cv.boolean,
     }
 ).extend(cv.COMPONENT_SCHEMA)
