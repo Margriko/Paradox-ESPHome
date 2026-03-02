@@ -263,11 +263,13 @@ void ParadoxCombusComponent::connect_combus_() {
     return;
   }
 
-  this->clk_pin_->pin_mode(gpio::FLAG_INPUT);
-  this->read_pin_->pin_mode(gpio::FLAG_INPUT);
+  // Honor YAML pin flags (pullups/inversion) configured via gpio_pin_expression.
+  this->clk_pin_->setup();
+  this->read_pin_->setup();
   if (this->write_pin_ == nullptr) {
     this->write_pin_ = this->read_pin_;
   }
+  this->write_pin_->setup();
   this->write_pin_->pin_mode(gpio::FLAG_INPUT);
 
   this->last_clk_state_ = this->clk_pin_->digital_read();
@@ -390,9 +392,9 @@ void ParadoxCombusComponent::log_bus_diagnostics_() {
     if (edges_per_second < 100.0f) {
       ESP_LOGW(TAG,
                "Very low COMBUS clock activity detected (%.1f falling edges/sec). "
-               "This usually indicates wiring/level-shifting/sampling issues. "
-               "Try invert_data, tune min_edge_interval_us/sample_delay_us, and verify optocoupler speed.",
-               edges_per_second);
+               "This usually indicates wiring/level-shifting/sampling issues (clk=%d read=%d). "
+               "Try pin pullups/mode, invert_data, tune min_edge_interval_us/sample_delay_us, and verify wiring levels.",
+               edges_per_second, this->clk_pin_->digital_read(), this->read_pin_->digital_read());
     }
   }
 

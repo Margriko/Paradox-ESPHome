@@ -89,4 +89,17 @@ alarm_control_panel:
   Values like `frame_idle_us: 150000` can merge multiple packets into one frame and will usually prevent decoding.
 - If diagnostics show very low clock activity (for example tens of edges/sec), decoding will fail regardless of CRC/frame tuning; this usually points to wiring, pull-up, level-shifting, or optocoupler speed limits.
 - Pin configuration moved from hardcoded C++ defines to YAML (`clk_pin`, plus either legacy `dta_pin` or split `read_pin`/`write_pin`).
+
+- If diagnostics stay below ~100 falling edges/sec (e.g. 10-30/sec), decoding cannot work yet. This is usually a GPIO level issue, not CRC tuning.
+  Try explicit pin modes:
+  ```yaml
+  clk_pin:
+    number: GPIO18
+    mode: INPUT_PULLUP
+  read_pin:
+    number: GPIO16
+    mode: INPUT_PULLUP
+  ```
+  and validate receive-only first by removing `write_pin` temporarily.
+
 - Existing sample configuration was migrated to this new format in `alarm.yaml`.

@@ -97,6 +97,17 @@ The old interrupt-driven implementation sampled on **falling** edges with a fixe
 
 If decoding is still unstable on ESP32 + `esp-idf`, keep `invert_data: false`, start with `min_edge_interval_us: 100`, and temporarily remove `write_pin` while validating receive-only traffic.
 
+- If diagnostics stay below ~100 falling edges/sec (e.g. 10-30/sec), decoding cannot work yet. This is usually a GPIO level issue, not CRC tuning.
+  Try explicit pin modes:
+  ```yaml
+  clk_pin:
+    number: GPIO18
+    mode: INPUT_PULLUP
+  read_pin:
+    number: GPIO16
+    mode: INPUT_PULLUP
+  ```
+  and validate receive-only first by removing `write_pin` temporarily.
 
 For a full multi-zone example, see `alarm-example.yaml`.
 
