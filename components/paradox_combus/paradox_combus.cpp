@@ -116,6 +116,9 @@ void ParadoxCombusComponent::capture_combus_bits_() {
       this->last_clk_state_ = clk_state;
       return;
     }
+    if (this->last_accepted_clk_edge_at_ != 0) {
+      this->last_clk_edge_interval_us_ = edge_interval;
+    }
     this->last_accepted_clk_edge_at_ = now;
   }
 
@@ -125,7 +128,22 @@ void ParadoxCombusComponent::capture_combus_bits_() {
   }
 
   if ((this->sample_on_rising_ && clk_rising) || (!this->sample_on_rising_ && clk_falling)) {
-    this->pending_sample_at_ = now + this->sample_delay_us_;
+    uint32_t effective_sample_delay_us = this->sample_delay_us_;
+    if (effective_sample_delay_us == 0) {
+      if (this->last_clk_edge_interval_us_ != 0) {
+        // Polling loop has scheduling jitter; sample around 1/3 of the observed half-cycle by default.
+        effective_sample_delay_us = this->last_clk_edge_interval_us_ / 3;
+        if (effective_sample_delay_us < 80) {
+          effective_sample_delay_us = 80;
+        } else if (effective_sample_delay_us > 450) {
+          effective_sample_delay_us = 450;
+        }
+      } else {
+        effective_sample_delay_us = 150;
+      }
+    }
+
+    this->pending_sample_at_ = now + effective_sample_delay_us;
     this->sample_pending_ = true;
   }
 
@@ -245,11 +263,13 @@ void ParadoxCombusComponent::connect_combus_() {
     return;
   }
 
-  this->clk_pin_->pin_mode(gpio::FLAG_INPUT);
-  this->read_pin_->pin_mode(gpio::FLAG_INPUT);
+  // Honor YAML pin flags (pullups/inversion) configured via gpio_pin_expression.
+  this->clk_pin_->setup();
+  this->read_pin_->setup();
   if (this->write_pin_ == nullptr) {
     this->write_pin_ = this->read_pin_;
   }
+  this->write_pin_->setup();
   this->write_pin_->pin_mode(gpio::FLAG_INPUT);
 
   this->last_clk_state_ = this->clk_pin_->digital_read();
@@ -257,6 +277,7 @@ void ParadoxCombusComponent::connect_combus_() {
   this->last_clk_signal_ = micros();
   this->last_diag_log_at_ = this->last_clk_signal_;
   this->last_accepted_clk_edge_at_ = 0;
+  this->last_clk_edge_interval_us_ = 0;
   this->clock_falling_edges_ = 0;
   this->rejected_clock_edges_ = 0;
   this->sampled_bits_ = 0;
@@ -273,10 +294,11 @@ void ParadoxCombusComponent::connect_combus_() {
 
   this->combus_connection_status_ = true;
   ESP_LOGI(TAG,
-           "COMBUS initialized in polling mode (frame_idle_us=%u, sample_delay_us=%u, sample_on_rising=%s, "
+           "COMBUS initialized in polling mode (frame_idle_us=%u, sample_delay_us=%u%s, sample_on_rising=%s, "
            "min_edge_interval_us=%u, invert_data=%s)",
            static_cast<unsigned>(this->frame_idle_us_), static_cast<unsigned>(this->sample_delay_us_),
-           YESNO(this->sample_on_rising_), static_cast<unsigned>(this->min_edge_interval_us_), YESNO(this->invert_data_));
+           this->sample_delay_us_ == 0 ? " (auto)" : "", YESNO(this->sample_on_rising_),
+           static_cast<unsigned>(this->min_edge_interval_us_), YESNO(this->invert_data_));
 }
 
 void ParadoxCombusComponent::disconnect_combus_() {
@@ -370,9 +392,9 @@ void ParadoxCombusComponent::log_bus_diagnostics_() {
     if (edges_per_second < 100.0f) {
       ESP_LOGW(TAG,
                "Very low COMBUS clock activity detected (%.1f falling edges/sec). "
-               "This usually indicates wiring/level-shifting/sampling issues. "
-               "Try invert_data, tune min_edge_interval_us/sample_delay_us, and verify optocoupler speed.",
-               edges_per_second);
+               "This usually indicates wiring/level-shifting/sampling issues (clk=%d read=%d). "
+               "Try pin pullups/mode, invert_data, tune min_edge_interval_us/sample_delay_us, and verify wiring levels.",
+               edges_per_second, this->clk_pin_->digital_read(), this->read_pin_->digital_read());
     }
   }
 

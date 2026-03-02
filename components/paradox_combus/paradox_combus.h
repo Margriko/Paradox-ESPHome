@@ -110,6 +110,7 @@ class ParadoxCombusComponent : public Component {
   unsigned long last_clk_signal_{0};
   unsigned long last_diag_log_at_{0};
   unsigned long last_accepted_clk_edge_at_{0};
+  uint32_t last_clk_edge_interval_us_{0};
   uint32_t clock_falling_edges_{0};
   uint32_t rejected_clock_edges_{0};
   uint32_t sampled_bits_{0};
@@ -121,12 +122,12 @@ class ParadoxCombusComponent : public Component {
   uint32_t malformed_d1_d0_frames_{0};
   std::string last_crc_fail_preview_;
   uint8_t last_crc_fail_cmd_{0};
-  uint32_t frame_idle_us_{25000};
-  uint32_t sample_delay_us_{350};
-  uint32_t min_edge_interval_us_{450};
+  uint32_t frame_idle_us_{10000};
+  uint32_t sample_delay_us_{0};
+  uint32_t min_edge_interval_us_{100};
   uint32_t misaligned_frame_drops_{0};
   bool invert_data_{false};
-  bool sample_on_rising_{true};
+  bool sample_on_rising_{false};
   bool combus_connection_status_{false};
 
 };
