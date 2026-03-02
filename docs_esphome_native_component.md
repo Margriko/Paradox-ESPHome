@@ -32,16 +32,16 @@ paradox_combus:
   id: combus
   clk_pin: D1
   # Optional frame boundary idle timeout in microseconds.
-  frame_idle_us: 25000
+  frame_idle_us: 10000
   # Optional sample delay after selected clock edge (40..900 us).
-  # Paradox COMBUS at 1 kHz often needs ~300-500 us for stable reads.
-  sample_delay_us: 350
-  # Sample on rising edge for slave->master packets (default).
-  # Set false to sample after falling edge if your wiring inverts bus phases.
-  sample_on_rising: true
+  # `0` enables adaptive delay derived from observed clock timing (recommended for polling mode).
+  sample_delay_us: 0
+  # Sample on falling edge by default (legacy-compatible baseline).
+  # Set true only if your wiring captures cleaner data on rising edges.
+  sample_on_rising: false
   # Reject clock transitions that arrive too quickly (noise/glitches).
-  # For 1 kHz COMBUS, start around 450-500 us.
-  min_edge_interval_us: 450
+  # For 1 kHz COMBUS, start around 80-150 us.
+  min_edge_interval_us: 100
   # Optional data polarity inversion for read sampling.
   invert_data: false
   # Legacy single data pin (shared read/write):
@@ -85,7 +85,7 @@ alarm_control_panel:
 ## Notes
 
 - The COMBUS parser/decoder remains based on the original implementation and now publishes directly to registered ESPHome entities.
-- If logs show repeated `bit length not byte-aligned` or `CRC mismatch` drops, start from `frame_idle_us: 25000`, `sample_on_rising: true`, `min_edge_interval_us: 450`, and `sample_delay_us: 350` (then tune in ~50 us steps).
+- If logs show repeated `bit length not byte-aligned` or `CRC mismatch` drops, start from `frame_idle_us: 10000`, `sample_on_rising: false`, `min_edge_interval_us: 100`, and `sample_delay_us: 0 (auto)` (then tune in ~50 us steps).
   Values like `frame_idle_us: 150000` can merge multiple packets into one frame and will usually prevent decoding.
 - If diagnostics show very low clock activity (for example tens of edges/sec), decoding will fail regardless of CRC/frame tuning; this usually points to wiring, pull-up, level-shifting, or optocoupler speed limits.
 - Pin configuration moved from hardcoded C++ defines to YAML (`clk_pin`, plus either legacy `dta_pin` or split `read_pin`/`write_pin`).
